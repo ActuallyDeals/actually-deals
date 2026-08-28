@@ -55,6 +55,15 @@ export const MERCHANTS: Merchant[] = [
     emoji: "🏬",
     affiliateTemplate: null,
   },
+  {
+    id: "merchant-macys",
+    name: "Macy's",
+    slug: "macys",
+    domain: "macys.com",
+    logoUrl: null,
+    emoji: "🛍️",
+    affiliateTemplate: null,
+  },
 ];
 
 export function merchantByName(name: string): Merchant | undefined {

@@ -1,78 +1,79 @@
 "use client";
 
-import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { loadVote, saveVote } from "@/lib/store";
 import type { Deal } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function AliveVoteBar({ deal }: { deal: Deal }) {
   const [current, setCurrent] = useState(deal);
-  const [vote, setVote] = useState(() => loadVote(deal.id));
+  const [voted, setVoted] = useState<"alive" | "expired" | null>(null);
   const total = current.upvotes + current.downvotes;
   const alivePercent = total === 0 ? 0 : Math.round((current.upvotes / total) * 100);
-  const expiredShare = total === 0 ? 0 : current.downvotes / total;
 
-  function onVote(isAlive: boolean) {
-    const result = saveVote(current, isAlive);
-    setCurrent(result.deal);
-    setVote(result.vote);
-    toast.success(isAlive ? "Marked still alive" : "Marked expired");
+  async function onVote(isAlive: boolean) {
+    if (voted) {
+      return;
+    }
+    try {
+      const response = await fetch("/api/votes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: current.slug, isAlive }),
+      });
+      const payload = (await response.json()) as { deal?: Deal; error?: string };
+      if (!response.ok || !payload.deal) {
+        throw new Error(payload.error || "Could not vote.");
+      }
+      setCurrent(payload.deal);
+      setVoted(isAlive ? "alive" : "expired");
+      toast.success(isAlive ? "Marked still good" : "Marked expired");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not vote.");
+    }
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Is this deal still alive?</h2>
+          <h2 className="text-lg font-black text-slate-900">Was this deal still good?</h2>
           <p className="text-sm text-slate-500">
             {total === 0
-              ? "Be the first hunter to confirm checkout."
-              : `${alivePercent}% of users confirm this deal is active`}
+              ? "Be the first to confirm checkout."
+              : `${alivePercent}% say this deal is still live`}
           </p>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => onVote(true)}
+            onClick={() => void onVote(true)}
             className={cn(
-              "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold",
-              vote?.isAlive === true
-                ? "bg-emerald-600 text-white"
-                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+              "rounded-lg px-3 py-2 text-sm font-bold",
+              voted === "alive" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-800",
             )}
           >
-            <ThumbsUp className="size-4" />
-            Still Alive ({current.upvotes})
+            Still good ({current.upvotes})
           </button>
           <button
             type="button"
-            onClick={() => onVote(false)}
+            onClick={() => void onVote(false)}
             className={cn(
-              "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold",
-              vote?.isAlive === false
-                ? "bg-red-600 text-white"
-                : "bg-red-50 text-red-800 hover:bg-red-100",
+              "rounded-lg px-3 py-2 text-sm font-bold",
+              voted === "expired" ? "bg-red-600 text-white" : "bg-red-50 text-red-800",
             )}
           >
-            <ThumbsDown className="size-4" />
             Expired ({current.downvotes})
           </button>
         </div>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
         <div
-          className="h-full rounded-full bg-emerald-600 transition-all"
+          className="h-full rounded-full bg-emerald-600"
           style={{ width: `${total === 0 ? 0 : alivePercent}%` }}
         />
       </div>
-      {expiredShare > 0.7 ? (
-        <p className="mt-3 text-sm font-semibold text-amber-800">
-          ⚠️ Reported Expired — more than 70% of voters say checkout no longer matches.
-        </p>
-      ) : null}
     </section>
   );
 }

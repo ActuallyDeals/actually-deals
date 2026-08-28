@@ -107,6 +107,9 @@ export function detectMerchantFromUrl(rawUrl: string): {
   if (host.includes("costco.")) {
     return { name: "Costco", slug: "costco", domain: "costco.com" };
   }
+  if (host.includes("macys.")) {
+    return { name: "Macy's", slug: "macys", domain: "macys.com" };
+  }
 
   const fallbackHost = host || "merchant";
   const name = fallbackHost.split(".")[0] ?? "Merchant";

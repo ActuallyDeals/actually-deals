@@ -1,0 +1,1271 @@
+Next.js Tutorial: Build a Full-Stack App in 13 Steps [2026]
+
+April 18, 2026
+
+30 min read
+
+Next.js has become the dominant React framework for production web applications, powering everything from startup MVPs to enterprise platforms. With Turbopack delivering 400% faster dev startup and React Server Components reducing client-side JavaScript by ~90% in specific static content cases, mastering Next.js is a career-defining skill for full-stack developers – the`next` package was already pulling roughly 8 million weekly npm downloads by March 2026, and Next.js 16.3.1 stood as the latest LTS release as of August 2026, according to Vercel.
+
+This tutorial walks you through building a complete full-stack task management application with Next.js, TypeScript, and the App Router. You will implement server components, server actions, dynamic routing, API routes, middleware authentication, database integration, and production deployment – all in 13 structured steps.
+
+By the end, you will have a working project you can deploy to Vercel or any Node.js host, plus the knowledge to build any production Next.js application from scratch.
+
+Google · Preferred Sources
+
+Don't miss new tech stories on Google
+
+Add Tech Insider once in the Google app and our stories appear in your news suggestions.
+
+## Prerequisites and Environment Setup
+
+Before starting this tutorial, make sure your development environment meets the following requirements. Next.js requires Node.js 18.17 or later, and this tutorial uses TypeScript throughout for type safety. If you’re starting from an existing Next.js 15.x project, note that endoflife.date and HeroDevs both flag the Next.js 15 line for end of support on October 21, 2026 – its last patch, 15.5.23, shipped by August 6, 2026 – so new projects should target the Next.js 16 LTS line used throughout this tutorial.
+
+| Tool | Minimum Version | Recommended Version | Purpose |
+| --- | --- | --- | --- |
+| Node.js | 18.17 | 20 LTS or 22 LTS | JavaScript runtime |
+| npm | 9.x | 10.x | Package manager |
+| TypeScript | 5.0 | 5.x (bundled) | Type safety |
+| Git | 2.30 | 2.40+ | Version control |
+| VS Code or Cursor | Latest | Latest | Code editor |
+| Browser | Chrome 120+ | Chrome or Firefox latest | Testing and DevTools |
+
+You should also have a basic understanding of React fundamentals – components, props, state, and hooks. Experience with HTML, CSS, and JavaScript is assumed. No prior Next.js experience is required; this tutorial covers everything from project creation to deployment.
+
+Verify your Node.js installation by opening a terminal and running:
+
+```
+node --version
+# Expected output: v20.x.x or v22.x.x
+
+npm --version
+# Expected output: 10.x.x
+```
+
+If Node.js is not installed or is below version 18.17, download the LTS release from nodejs.org. Using a version manager like nvm is recommended for managing multiple Node.js versions across projects.
+
+## Step 1 – Create a New Next.js Project with TypeScript
+
+The fastest way to start a Next.js project is with`create-next-app`, the official scaffolding tool. It sets up TypeScript, ESLint, Tailwind CSS, and the App Router automatically, so you can skip manual configuration and start writing features immediately.
+
+Run the following command in your terminal:
+
+```
+npx create-next-app@latest taskflow --typescript --tailwind --eslint --app --src-dir --use-npm
+
+cd taskflow
+```
+
+This creates a project called`taskflow` with the following flags:
+
+–typescript enables TypeScript with a pre-configured`tsconfig.json`. –tailwind installs Tailwind CSS v4 for utility-first styling. –eslint adds ESLint with Next.js-specific rules. –app uses the App Router (the recommended routing system). –src-dir places application code inside a`src/` directory for cleaner project organization. –use-npm ensures npm is the package manager.
+
+After creation, start the development server:
+
+```
+npm run dev
+```
+
+Open`http://localhost:3000` in your browser. You should see the default Next.js welcome page. With Turbopack enabled by default in the latest versions, the dev server starts significantly faster than previous versions – Vercel reports approximately 400% faster startup versus webpack-based builds, a gain already present when Next.js 16.2 became available by March 2026 and carried through to Next.js 16.3, which Vercel shipped in August 2026, along with ~50% faster rendering and 10x faster HMR in Turbopack.[1][2][3][4]
+
+Your project structure looks like this:
+
+```
+taskflow/
+├── src/
+│   └── app/
+│       ├── layout.tsx      # Root layout (wraps all pages)
+│       ├── page.tsx         # Home page (/)
+│       ├── globals.css      # Global styles + Tailwind
+│       └── favicon.ico
+├── public/                  # Static assets
+├── next.config.ts           # Next.js configuration
+├── tsconfig.json            # TypeScript config
+├── tailwind.config.ts       # Tailwind config
+├── package.json
+└── .eslintrc.json
+```
+
+The`src/app/` directory is where all your routes, components, and API endpoints live. Each folder inside`app/` becomes a URL route automatically – this is the file-system-based routing that makes Next.js so productive.
+
+## Step 2 – Understand the App Router and File Conventions
+
+The App Router is the recommended routing system in Next.js, built on React Server Components. Understanding its file conventions is essential before building any pages. Every file inside`src/app/` has a specific purpose based on its name.
+
+| File Name | Purpose | Renders As |
+| --- | --- | --- |
+| `page.tsx` | Defines the UI for a route | Server Component (default) |
+| `layout.tsx` | Shared layout wrapping child routes | Server Component (default) |
+| `loading.tsx` | Loading UI shown during navigation | Server Component |
+| `error.tsx` | Error boundary for the route | Client Component (required) |
+| `not-found.tsx` | Custom 404 page for the route | Server Component |
+| `route.ts` | API endpoint (no UI) | Server-only |
+| `template.tsx` | Like layout but re-mounts on navigation | Server Component |
+
+The critical concept here is that components are Server Components by default. This means they run on the server, have zero JavaScript sent to the browser, and can directly access databases, file systems, and environment variables. Only when you add the`"use client"` directive at the top of a file does it become a Client Component with access to browser APIs, state, and effects.
+
+This server-first architecture is a fundamental shift from traditional React SPAs. Instead of shipping an entire React application to the browser and fetching data via API calls, Next.js renders most of your UI on the server and sends pre-rendered HTML to the client. The result is faster initial page loads, better SEO, and significantly less JavaScript shipped to the browser.
+
+Nested routing works by folder structure. To create a route at`/dashboard/settings`, you create`src/app/dashboard/settings/page.tsx`. Each level can have its own layout, loading state, and error boundary, enabling granular control over the UI at every level of your application.
+
+Dynamic routes use bracket syntax. A file at`src/app/tasks/[id]/page.tsx` matches any URL like`/tasks/1`,`/tasks/abc`, and so on. The`id` parameter is available as a prop in your page component. This is how you build detail pages, user profiles, and any route that depends on a variable segment.
+
+## Step 3 – Build the Home Page with Server Components
+
+Now replace the default welcome page with a real home page for the task management app. Open`src/app/page.tsx` and replace its contents entirely:
+
+```
+// src/app/page.tsx
+import Link from "next/link";
+
+// This is a Server Component by default — no "use client" needed
+export default function HomePage() {
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return (
+    <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
+      <div className="max-w-2xl text-center">
+        <h1 className="text-5xl font-bold text-gray-900 mb-4">
+          TaskFlow
+        </h1>
+        <p className="text-xl text-gray-600 mb-2">
+          A full-stack task management app built with Next.js
+        </p>
+        <p className="text-sm text-gray-400 mb-8">{currentDate}</p>
+
+        <div className="flex gap-4 justify-center">
+          <Link
+            href="/tasks"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg
+                       hover:bg-blue-700 transition-colors font-medium"
+          >
+            View Tasks
+          </Link>
+          <Link
+            href="/tasks/new"
+            className="border border-gray-300 text-gray-700 px-6 py-3
+                       rounded-lg hover:bg-gray-100 transition-colors font-medium"
+          >
+            Create Task
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+```
+
+Notice several important patterns in this code. First, there is no`"use client"` directive, so this is a Server Component. The`Date` object is created on the server during rendering, not in the browser. Second, we use the`Link` component from`next/link` instead of HTML` ` tags. The`Link` component enables client-side navigation – when users click these links, Next.js fetches only the new page’s content without a full page reload, creating an app-like experience.
+
+Third, Tailwind CSS classes handle all styling inline. This eliminates the need for separate CSS files or CSS modules for most components. The utility classes like`min-h-screen`,`flex`,`text-5xl`, and`hover:bg-blue-700` compile to minimal CSS at build time – unused classes are automatically removed by Tailwind’s purge process.
+
+Save the file and check your browser at`http://localhost:3000`. You should see the TaskFlow home page with two navigation buttons. Thanks to Turbopack’s fast refresh, changes appear almost instantly without losing component state.
+
+## Step 4 – Create a Data Layer with TypeScript Types and Mock Data
+
+Before building more pages, define the data structures and create a simple data layer. In a production application, this would connect to a database like PostgreSQL or a service like Supabase. For this tutorial, we start with an in-memory store that you can later replace with any database.
+
+Create the types file:
+
+```
+// src/lib/types.ts
+export type Priority = "low" | "medium" | "high";
+export type Status = "todo" | "in-progress" | "done";
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string;
+  priority: Priority;
+  status: Status;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateTaskInput {
+  title: string;
+  description: string;
+  priority: Priority;
+}
+
+export interface UpdateTaskInput {
+  title?: string;
+  description?: string;
+  priority?: Priority;
+  status?: Status;
+}
+```
+
+Next, create the data store with CRUD operations:
+
+```
+// src/lib/tasks.ts
+import { Task, CreateTaskInput, UpdateTaskInput } from "./types";
+
+// In-memory store — replace with a database in production
+const tasks: Map<string, Task> = new Map();
+
+// Seed with sample data
+const seedTasks: Task[] = [
+  {
+    id: "1",
+    title: "Set up CI/CD pipeline",
+    description: "Configure GitHub Actions for automated testing and deployment",
+    priority: "high",
+    status: "in-progress",
+    createdAt: new Date("2026-04-10"),
+    updatedAt: new Date("2026-04-15"),
+  },
+  {
+    id: "2",
+    title: "Write API documentation",
+    description: "Document all REST endpoints with request/response examples",
+    priority: "medium",
+    status: "todo",
+    createdAt: new Date("2026-04-12"),
+    updatedAt: new Date("2026-04-12"),
+  },
+  {
+    id: "3",
+    title: "Fix authentication bug",
+    description: "Session token not refreshing after password change",
+    priority: "high",
+    status: "todo",
+    createdAt: new Date("2026-04-14"),
+    updatedAt: new Date("2026-04-14"),
+  },
+  {
+    id: "4",
+    title: "Add dark mode support",
+    description: "Implement system-preference-aware dark mode with Tailwind",
+    priority: "low",
+    status: "done",
+    createdAt: new Date("2026-04-08"),
+    updatedAt: new Date("2026-04-16"),
+  },
+];
+
+seedTasks.forEach((task) => tasks.set(task.id, task));
+
+let nextId = 5;
+
+export function getAllTasks(): Task[] {
+  return Array.from(tasks.values()).sort(
+    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+  );
+}
+
+export function getTaskById(id: string): Task | undefined {
+  return tasks.get(id);
+}
+
+export function createTask(input: CreateTaskInput): Task {
+  const task: Task = {
+    id: String(nextId++),
+    title: input.title,
+    description: input.description,
+    priority: input.priority,
+    status: "todo",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  tasks.set(task.id, task);
+  return task;
+}
+
+export function updateTask(id: string, input: UpdateTaskInput): Task | null {
+  const task = tasks.get(id);
+  if (!task) return null;
+
+  const updated: Task = {
+    ...task,
+    ...input,
+    updatedAt: new Date(),
+  };
+  tasks.set(id, updated);
+  return updated;
+}
+
+export function deleteTask(id: string): boolean {
+  return tasks.delete(id);
+}
+```
+
+This data layer uses a`Map` for O(1) lookups and provides typed functions for every CRUD operation. Because Server Components run on the server, you can call these functions directly from your page components without an API layer – one of the biggest productivity gains of the App Router architecture.
+
+The`CreateTaskInput` and`UpdateTaskInput` types enforce what fields are required for creation versus update. This pattern prevents bugs where you accidentally forget a required field or pass invalid data.
+
+## Step 5 – Build the Task List Page with Dynamic Rendering
+
+Create the tasks listing page that displays all tasks with their status, priority, and timestamps. This page demonstrates how Server Components fetch data directly without useEffect or loading spinners.
+
+Create the directory structure and page file:
+
+```
+// src/app/tasks/page.tsx
+import Link from "next/link";
+import { getAllTasks } from "@/lib/tasks";
+import { Task } from "@/lib/types";
+
+const priorityColors: Record<string, string> = {
+  low: "bg-green-100 text-green-800",
+  medium: "bg-yellow-100 text-yellow-800",
+  high: "bg-red-100 text-red-800",
+};
+
+const statusLabels: Record<string, string> = {
+  todo: "To Do",
+  "in-progress": "In Progress",
+  done: "Done",
+};
+
+function TaskCard({ task }: { task: Task }) {
+  return (
+    <Link
+      href={`/tasks/${task.id}`}
+      className="block bg-white rounded-lg border border-gray-200
+                 p-5 hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <h3 className="text-lg font-semibold text-gray-900">{task.title}</h3>
+        <span
+          className={`text-xs font-medium px-2.5 py-0.5 rounded
+                      ${priorityColors[task.priority]}`}
+        >
+          {task.priority}
+        </span>
+      </div>
+      <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+        {task.description}
+      </p>
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span>{statusLabels[task.status]}</span>
+        <span>Updated {task.updatedAt.toLocaleDateString()}</span>
+      </div>
+    </Link>
+  );
+}
+
+export default function TasksPage() {
+  // Direct data access — no API call, no useEffect, no loading state
+  const tasks = getAllTasks();
+
+  return (
+    <main className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">All Tasks</h1>
+          <Link
+            href="/tasks/new"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg
+                       hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            + New Task
+          </Link>
+        </div>
+
+        {tasks.length === 0 ? (
+          <p className="text-gray-500 text-center py-12">
+            No tasks yet. Create your first task to get started.
+          </p>
+        ) : (
+          <div className="grid gap-4">
+            {tasks.map((task) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+```
+
+The key takeaway here is the`getAllTasks()` call. In a traditional React SPA, you would use`useEffect` to fetch data from an API endpoint, manage loading and error states, and handle race conditions. With Server Components, you simply call the function. The component runs on the server, the data is fetched, and the rendered HTML is sent to the client. Zero client-side JavaScript is needed for this page.
+
+The`@/lib/tasks` import path uses the`@` alias configured automatically by`create-next-app`. It maps to`src/`, so`@/lib/tasks` resolves to`src/lib/tasks.ts`. This avoids messy relative paths like`../../lib/tasks` and keeps imports clean as your project grows.
+
+Add a layout specific to the tasks section that provides shared navigation:
+
+```
+// src/app/tasks/layout.tsx
+import Link from "next/link";
+
+export default function TasksLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <nav className="bg-white border-b border-gray-200 px-8 py-3">
+        <div className="max-w-4xl mx-auto flex items-center gap-6">
+          <Link href="/" className="text-lg font-bold text-blue-600">
+            TaskFlow
+          </Link>
+          <Link
+            href="/tasks"
+            className="text-sm text-gray-600 hover:text-gray-900"
+          >
+            All Tasks
+          </Link>
+        </div>
+      </nav>
+      {children}
+    </div>
+  );
+}
+```
+
+This layout wraps every page under`/tasks/*`. When users navigate between`/tasks`,`/tasks/new`, and`/tasks/[id]`, the layout remains mounted and only the`{children}` portion updates. This gives you persistent navigation without re-rendering the entire page.
+
+## Step 6 – Implement Dynamic Routes for Task Details
+
+Dynamic routes let you create pages that respond to variable URL segments. For the task detail page, you need a route that matches`/tasks/1`,`/tasks/2`, and any task ID.
+
+Create the dynamic route file:
+
+```
+// src/app/tasks/[id]/page.tsx
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { getTaskById } from "@/lib/tasks";
+import { DeleteButton } from "./delete-button";
+import { StatusToggle } from "./status-toggle";
+
+interface TaskPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function TaskPage({ params }: TaskPageProps) {
+  const { id } = await params;
+  const task = getTaskById(id);
+
+  if (!task) {
+    notFound();
+  }
+
+  const priorityColor = {
+    low: "bg-green-100 text-green-800",
+    medium: "bg-yellow-100 text-yellow-800",
+    high: "bg-red-100 text-red-800",
+  }[task.priority];
+
+  return (
+    <main className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-2xl mx-auto">
+        <Link
+          href="/tasks"
+          className="text-sm text-blue-600 hover:underline mb-6 block"
+        >
+          ← Back to Tasks
+        </Link>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-8">
+          <div className="flex items-start justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">{task.title}</h1>
+            <span className={`text-xs font-medium px-3 py-1 rounded ${priorityColor}`}>
+              {task.priority}
+            </span>
+          </div>
+
+          <p className="text-gray-600 mb-6">{task.description}</p>
+
+          <div className="grid grid-cols-2 gap-4 text-sm text-gray-500 mb-8">
+            <div>
+              <span className="font-medium text-gray-700">Status: </span>
+              {task.status}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Created: </span>
+              {task.createdAt.toLocaleDateString()}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <StatusToggle taskId={task.id} currentStatus={task.status} />
+            <DeleteButton taskId={task.id} />
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+```
+
+The`[id]` folder name tells Next.js this is a dynamic segment. The`params` prop contains the captured value. Notice the`notFound()` function from`next/navigation`– calling it immediately renders the closest`not-found.tsx` boundary, returning a proper 404 status code to the browser.
+
+In the latest Next.js versions,`params` is a`Promise` that must be awaited. This change supports streaming and partial pre-rendering. If you forget to await it, TypeScript will flag the error immediately.
+
+The`DeleteButton` and`StatusToggle` components need interactivity (click handlers), so they must be Client Components. Create them in the same directory:
+
+```
+// src/app/tasks/[id]/delete-button.tsx
+"use client";
+
+import { useRouter } from "next/navigation";
+import { deleteTaskAction } from "@/app/actions";
+
+export function DeleteButton({ taskId }: { taskId: string }) {
+  const router = useRouter();
+
+  async function handleDelete() {
+    if (!confirm("Are you sure you want to delete this task?")) return;
+    await deleteTaskAction(taskId);
+    router.push("/tasks");
+  }
+
+  return (
+    <button
+      onClick={handleDelete}
+      className="bg-red-50 text-red-600 px-4 py-2 rounded-lg
+                 hover:bg-red-100 transition-colors text-sm font-medium"
+    >
+      Delete Task
+    </button>
+  );
+}
+```
+
+The`"use client"` directive at the top marks this as a Client Component. It can use browser APIs, event handlers, and React hooks like`useRouter`. The`deleteTaskAction` is a Server Action we will create in Step 8 – it runs on the server even though it is called from a Client Component.
+
+## Step 7 – Create Forms with Server Actions
+
+Server Actions are functions that run on the server but can be called from both Server and Client Components. They replace traditional API routes for form submissions and data mutations, dramatically reducing the amount of code needed for CRUD operations.
+
+Create a centralized actions file:
+
+```
+// src/app/actions.ts
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createTask, updateTask, deleteTask } from "@/lib/tasks";
+import type { Priority, Status } from "@/lib/types";
+
+export async function createTaskAction(formData: FormData) {
+  const title = formData.get("title") as string;
+  const description = formData.get("description") as string;
+  const priority = formData.get("priority") as Priority;
+
+  if (!title || title.trim().length === 0) {
+    throw new Error("Title is required");
+  }
+
+  createTask({
+    title: title.trim(),
+    description: description?.trim() || "",
+    priority: priority || "medium",
+  });
+
+  revalidatePath("/tasks");
+  redirect("/tasks");
+}
+
+export async function updateStatusAction(taskId: string, status: Status) {
+  updateTask(taskId, { status });
+  revalidatePath("/tasks");
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function deleteTaskAction(taskId: string) {
+  deleteTask(taskId);
+  revalidatePath("/tasks");
+}
+```
+
+The`"use server"` directive marks every exported function in this file as a Server Action. These functions run exclusively on the server – even when called from a Client Component, the browser sends a POST request to the server, which executes the function and returns the result. Sensitive logic like database writes and validation never reaches the client.
+
+The`revalidatePath` function tells Next.js to regenerate the cached version of a page the next time it is requested. Without this call, your task list page would continue showing stale data after creating or deleting a task. The`redirect` function performs a server-side redirect after the action completes.
+
+Now build the task creation form:
+
+```
+// src/app/tasks/new/page.tsx
+import { createTaskAction } from "@/app/actions";
+
+export default function NewTaskPage() {
+  return (
+    <main className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-lg mx-auto">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          Create New Task
+        </h1>
+
+        <form action={createTaskAction} className="bg-white rounded-lg
+              border border-gray-200 p-6 space-y-5">
+          <div>
+            <label htmlFor="title"
+              className="block text-sm font-medium text-gray-700 mb-1">
+              Title
+            </label>
+            <input
+              type="text"
+              id="title"
+              name="title"
+              required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter task title"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="description"
+              className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              rows={4}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Describe the task"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="priority"
+              className="block text-sm font-medium text-gray-700 mb-1">
+              Priority
+            </label>
+            <select
+              id="priority"
+              name="priority"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            >
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-2.5 rounded-lg
+                       hover:bg-blue-700 transition-colors font-medium"
+          >
+            Create Task
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
+```
+
+The`action={createTaskAction}` attribute on the form element is the key integration point. When the form is submitted, Next.js serializes the form data and sends it to the server action. No fetch calls, no API routes, no state management – the form just works. This progressive enhancement pattern means the form even works without JavaScript enabled in the browser.
+
+## Step 8 – Add API Routes for External Integrations
+
+While Server Actions handle form submissions elegantly, you still need traditional API routes for external integrations, webhooks, mobile apps, and third-party services. Next.js API routes in the App Router use`route.ts` files with named HTTP method exports.
+
+Create the tasks API endpoint:
+
+```
+// src/app/api/tasks/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { getAllTasks, createTask } from "@/lib/tasks";
+import type { Priority } from "@/lib/types";
+
+// GET /api/tasks — list all tasks
+export async function GET() {
+  const tasks = getAllTasks();
+  return NextResponse.json(tasks);
+}
+
+// POST /api/tasks — create a new task
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+
+  if (!body.title || typeof body.title !== "string") {
+    return NextResponse.json(
+      { error: "Title is required and must be a string" },
+      { status: 400 }
+    );
+  }
+
+  const validPriorities: Priority[] = ["low", "medium", "high"];
+  const priority = validPriorities.includes(body.priority)
+    ? body.priority
+    : "medium";
+
+  const task = createTask({
+    title: body.title.trim(),
+    description: body.description?.trim() || "",
+    priority,
+  });
+
+  return NextResponse.json(task, { status: 201 });
+}
+```
+
+Add a dynamic API route for individual task operations:
+
+```
+// src/app/api/tasks/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { getTaskById, updateTask, deleteTask } from "@/lib/tasks";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+// GET /api/tasks/:id
+export async function GET(_request: NextRequest, { params }: RouteParams) {
+  const { id } = await params;
+  const task = getTaskById(id);
+
+  if (!task) {
+    return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(task);
+}
+
+// PATCH /api/tasks/:id
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const { id } = await params;
+  const body = await request.json();
+  const updated = updateTask(id, body);
+
+  if (!updated) {
+    return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(updated);
+}
+
+// DELETE /api/tasks/:id
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+  const { id } = await params;
+  const deleted = deleteTask(id);
+
+  if (!deleted) {
+    return NextResponse.json({ error: "Task not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ message: "Task deleted" });
+}
+```
+
+Test the API with curl:
+
+```
+# List all tasks
+curl http://localhost:3000/api/tasks | python3 -m json.tool
+
+# Create a task
+curl -X POST http://localhost:3000/api/tasks 
+  -H "Content-Type: application/json" 
+  -d '{"title":"Test API task","description":"Created via API","priority":"high"}'
+
+# Expected output:
+# {
+#   "id": "5",
+#   "title": "Test API task",
+#   "description": "Created via API",
+#   "priority": "high",
+#   "status": "todo",
+#   "createdAt": "2026-04-18T...",
+#   "updatedAt": "2026-04-18T..."
+# }
+```
+
+Each exported function name corresponds to an HTTP method –`GET`,`POST`,`PATCH`,`DELETE`. Next.js automatically routes requests to the correct handler. You cannot have both a`page.tsx` and a`route.ts` in the same directory, as they would conflict – pages serve HTML while routes serve data.
+
+## Step 9 – Implement Middleware for Authentication
+
+Middleware runs before every request to your application, making it ideal for authentication checks, redirects, header manipulation, and request logging. Create a middleware file in the`src/` directory:
+
+```
+// src/middleware.ts
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export function middleware(request: NextRequest) {
+  // Example: protect /tasks routes with a simple token check
+  const isProtectedRoute = request.nextUrl.pathname.startsWith("/tasks");
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
+
+  if (isProtectedRoute || isApiRoute) {
+    // Check for auth token in cookies
+    const authToken = request.cookies.get("auth-token")?.value;
+
+    // For this tutorial, accept any non-empty token
+    // In production, validate against your auth provider
+    if (!authToken) {
+      if (isApiRoute) {
+        return NextResponse.json(
+          { error: "Authentication required" },
+          { status: 401 }
+        );
+      }
+      // Redirect web requests to home page
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+  }
+
+  // Add security headers to all responses
+  const response = NextResponse.next();
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+
+  return response;
+}
+
+// Configure which routes the middleware applies to
+export const config = {
+  matcher: [
+    // Match all routes except static files and Next.js internals
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
+};
+```
+
+The`config.matcher` pattern controls which routes trigger the middleware. The regex`/((?!_next/static|_next/image|favicon.ico).*)` applies middleware to all routes except Next.js static assets. This prevents middleware from running on every CSS file, image, and JavaScript bundle, which would degrade performance.
+
+For this tutorial, disable the auth check during development by commenting out the redirect logic or by setting a cookie in your browser DevTools. In production, you would integrate a proper authentication library like NextAuth.js, Clerk, or Auth0.
+
+The security headers added to every response follow OWASP best practices:`X-Frame-Options: DENY` prevents clickjacking attacks,`X-Content-Type-Options: nosniff` blocks MIME type sniffing, and`Referrer-Policy` controls how much referrer information is sent with requests.
+
+## Step 10 – Add Loading States and Error Boundaries
+
+The App Router provides built-in support for loading and error states through special file conventions. These work with React Suspense under the hood, giving you granular control over the user experience during data fetching and error recovery.
+
+Add a loading state for the tasks page:
+
+```
+// src/app/tasks/loading.tsx
+export default function TasksLoading() {
+  return (
+    <main className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div className="h-9 w-32 bg-gray-200 rounded animate-pulse" />
+          <div className="h-10 w-28 bg-gray-200 rounded-lg animate-pulse" />
+        </div>
+        <div className="grid gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-lg border
+                  border-gray-200 p-5 animate-pulse">
+              <div className="h-6 w-3/4 bg-gray-200 rounded mb-3" />
+              <div className="h-4 w-full bg-gray-100 rounded mb-2" />
+              <div className="h-4 w-1/2 bg-gray-100 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+```
+
+Add an error boundary:
+
+```
+// src/app/tasks/error.tsx
+"use client"; // Error boundaries must be Client Components
+
+export default function TasksError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          Something went wrong
+        </h2>
+        <p className="text-gray-600 mb-6">{error.message}</p>
+        <button
+          onClick={reset}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg
+                     hover:bg-blue-700 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    </main>
+  );
+}
+```
+
+The`loading.tsx` file automatically wraps the page in a React Suspense boundary. When navigating to`/tasks`, Next.js instantly shows the loading skeleton while the page component renders on the server. This eliminates the flash of empty content that plagues traditional SPAs.
+
+The`error.tsx` file catches any runtime errors thrown by the page or its children. The`reset` function lets users retry the failed operation without a full page reload. Error boundaries are scoped to their route segment – an error in`/tasks/[id]` won’t crash the entire tasks layout.
+
+## Step 11 – Configure Metadata and SEO
+
+Search engine optimization is a core strength of Next.js. The framework provides a type-safe metadata API that generates all necessary` ` tags, Open Graph images, and structured data automatically.
+
+Update the root layout with global metadata:
+
+```
+// src/app/layout.tsx
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: {
+    default: "TaskFlow — Full-Stack Task Management",
+    template: "%s | TaskFlow",
+  },
+  description:
+    "A modern task management application built with Next.js, TypeScript, and Tailwind CSS.",
+  keywords: ["task management", "next.js", "react", "typescript"],
+  authors: [{ name: "TaskFlow Team" }],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: "TaskFlow",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>{children}</body>
+    </html>
+  );
+}
+```
+
+Add page-specific metadata to the tasks page:
+
+```
+// Add this export to src/app/tasks/page.tsx
+export const metadata: Metadata = {
+  title: "All Tasks",
+  description: "View and manage all your tasks in TaskFlow.",
+};
+```
+
+For dynamic pages, use the`generateMetadata` function:
+
+```
+// Add to src/app/tasks/[id]/page.tsx
+import type { Metadata } from "next";
+
+export async function generateMetadata({
+  params,
+}: TaskPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const task = getTaskById(id);
+
+  if (!task) {
+    return { title: "Task Not Found" };
+  }
+
+  return {
+    title: task.title,
+    description: task.description,
+  };
+}
+```
+
+The`title.template` pattern in the root layout means child pages only need to set a short title. A page with`title: "All Tasks"` renders as`All Tasks | TaskFlow` in the browser tab. The`generateMetadata` function runs on the server and can fetch data to create dynamic titles and descriptions – essential for SEO on detail pages.
+
+Next.js also automatically generates a`robots.txt` and`sitemap.xml` when you export them from the app directory. For production applications, add these files to ensure search engines can discover and index all your pages efficiently.
+
+## Step 12 – Optimize Performance with Caching and Static Generation
+
+Next.js provides multiple rendering strategies that you control at the route level. Understanding when to use each strategy is critical for production performance.
+
+| Strategy | When It Renders | Best For | Cache Behavior |
+| --- | --- | --- | --- |
+| Static (SSG) | Build time | Marketing pages, docs, blogs | CDN-cached until redeployed |
+| Dynamic (SSR) | Every request | User-specific data, real-time feeds | No cache by default |
+| ISR | Background revalidation | Product pages, listings | Cached with timed revalidation |
+| Streaming | Progressive chunks | Slow data sources, dashboards | Partial cache |
+
+Configure route-level caching by exporting constants from your page files:
+
+```
+// Static page — rendered once at build time
+export const dynamic = "force-static";
+
+// Dynamic page — rendered on every request
+export const dynamic = "force-dynamic";
+
+// ISR — revalidate every 60 seconds
+export const revalidate = 60;
+
+// Opt out of caching for a specific fetch
+const data = await fetch("https://api.example.com/data", {
+  cache: "no-store",
+});
+```
+
+For the task management app, the task list page should be dynamic (tasks change frequently), while a hypothetical about page could be static. You can also use`generateStaticParams` to pre-render specific dynamic routes at build time:
+
+```
+// Pre-render specific task detail pages at build time
+export async function generateStaticParams() {
+  const tasks = getAllTasks();
+  return tasks.map((task) => ({
+    id: task.id,
+  }));
+}
+```
+
+Image optimization is another performance feature built into Next.js. The`next/image` component automatically serves images in modern formats like WebP and AVIF, lazy-loads images below the fold, and generates responsive srcsets. Always use`next/image` instead of raw` ` tags to benefit from these optimizations without any manual configuration.
+
+Font optimization via`next/font` eliminates layout shift by self-hosting Google Fonts and applying the`font-display: swap` strategy automatically. The Inter font import in our root layout uses this feature – the font file is downloaded at build time, bundled with your application, and served from the same domain, eliminating the external request to Google Fonts.
+
+## Step 13 – Deploy to Production
+
+With the application complete, deploy it to production. Vercel is the company behind Next.js and offers the most smooth deployment experience, but you can deploy to any platform that supports Node.js.
+
+### Option A: Deploy to Vercel
+
+Push your code to a Git repository and connect it to Vercel:
+
+```
+# Initialize git and push to GitHub
+git init
+git add .
+git commit -m "Initial TaskFlow application"
+git remote add origin https://github.com/YOUR_USERNAME/taskflow.git
+git push -u origin main
+
+# Install Vercel CLI and deploy
+npm i -g vercel
+vercel
+
+# Follow the prompts:
+# - Link to your Vercel account
+# - Confirm project settings
+# - Deploy
+
+# Expected output:
+# 🔗  Linked to your-name/taskflow
+# 🔍  Inspect: https://vercel.com/your-name/taskflow/...
+# ✅  Production: https://taskflow.vercel.app
+```
+
+Vercel automatically detects Next.js projects, runs`next build`, and deploys with optimal settings including edge caching, serverless functions, and automatic HTTPS. Every git push triggers a new deployment, and every pull request gets a preview URL.
+
+### Option B: Deploy with Docker
+
+For self-hosted deployments, use Docker:
+
+```
+# Dockerfile
+FROM node:20-alpine AS base
+
+FROM base AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --only=production
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+EXPOSE 3000
+ENV PORT=3000
+CMD ["node", "server.js"]
+```
+
+Enable standalone output in`next.config.ts` to create a self-contained deployment:
+
+```
+// next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  output: "standalone",
+};
+
+export default nextConfig;
+```
+
+Build and run the Docker container:
+
+```
+docker build -t taskflow .
+docker run -p 3000:3000 taskflow
+
+# Test the deployment
+curl http://localhost:3000
+# Expected: HTML response with TaskFlow content
+```
+
+The standalone output mode creates a minimal deployment artifact that includes only the files needed to run the application. The resulting Docker image is typically under 100 MB compared to 500+ MB for a full`node_modules` deployment.
+
+## 5 Common Pitfalls and How to Avoid Them
+
+Pitfall 1: Using hooks in Server Components. If you add`useState`,`useEffect`, or any React hook to a Server Component, you get a build error. The fix is to add`"use client"` at the top of the file – but only do this when you actually need client-side interactivity. Keep as much logic as possible in Server Components for better performance.
+
+Pitfall 2: Importing Server-only code in Client Components. If a Client Component imports a module that uses Node.js APIs (like`fs` or database drivers), the build fails because those APIs don’t exist in the browser. Use the`server-only` npm package to mark modules that should never be imported in Client Components – it gives a clear build-time error instead of a cryptic runtime failure.
+
+Pitfall 3: Not awaiting params in dynamic routes. In the latest Next.js versions,`params` and`searchParams` are Promises. If you destructure them synchronously, TypeScript may not catch the error in all cases, leading to runtime issues. Always use`const { id } = await params;` in async page components.
+
+Pitfall 4: Putting route.ts and page.tsx in the same directory. A directory can either be a page route (serving HTML via`page.tsx`) or an API route (serving data via`route.ts`), but not both. If you need both a page at`/tasks` and an API at`/tasks`, put the API route at`/api/tasks/route.ts` instead.
+
+Pitfall 5: Over-using Client Components. New Next.js developers often add`"use client"` to every component out of habit. This defeats the purpose of Server Components and increases your JavaScript bundle size. Only use Client Components when you need event handlers, state, effects, or browser APIs. A good rule of thumb: start with Server Components and only add`"use client"` when the compiler tells you to.
+
+## Troubleshooting Guide
+
+Error: “You’re importing a component that needs useState” – You are using a React hook in a Server Component. Add`"use client"` to the top of the file that uses the hook, or refactor to extract the interactive part into a separate Client Component.
+
+Error: “Module not found: Can’t resolve ‘fs'” – A Client Component is importing a module that uses Node.js built-in APIs. Move the Node.js-dependent code to a Server Component or an API route, and pass the data down as props.
+
+Error: “params should be awaited before using its properties” – You are accessing`params.id` without awaiting the params Promise. Change your function to`async` and add`const { id } = await params;` before using the parameter.
+
+Pages return stale data after mutations – You forgot to call`revalidatePath()` in your Server Action. After any data mutation (create, update, delete), call`revalidatePath("/affected-route")` to tell Next.js to regenerate the cached page.
+
+Middleware runs on static files – Your middleware`config.matcher` is too broad. Add exclusions for`_next/static`,`_next/image`, and`favicon.ico` to prevent middleware from running on every asset request.
+
+Error: “Hydration failed because the initial UI does not match” – The server-rendered HTML differs from what React renders on the client. Common causes include using`Date.now()`,`Math.random()`, or browser-only APIs like`window.innerWidth` during the initial render. Move these to a`useEffect` or guard them with`typeof window !== "undefined"`.
+
+CSS not applying in production – Tailwind CSS may be purging classes that appear only in dynamic strings. Instead of constructing class names like``bg-${color}-500``, use a complete class string from a lookup object. Tailwind can only detect classes that appear as complete strings in your source code.
+
+API routes return 405 Method Not Allowed – You are using the wrong export name. API routes must export named functions matching HTTP methods in uppercase:`GET`,`POST`,`PUT`,`PATCH`,`DELETE`. A function named`get`(lowercase) will not be recognized.
+
+Build fails with “Type error: Route has invalid export” – You have an export in a page or route file that Next.js doesn’t recognize. Common causes include exporting a variable with a typo in the name (like`metaData` instead of`metadata`) or exporting incompatible types from a`route.ts` file.
+
+## Advanced Tips for Production Applications
+
+Parallel Routes for complex layouts. Use the`@folder` convention to render multiple pages in the same layout simultaneously. This is useful for dashboards where you want a sidebar, main content, and modal to be independently routable. Define slots like`@sidebar`,`@content`, and`@modal` in your layout, and each slot can have its own loading and error states.
+
+Intercepting Routes for modal patterns. The`(.)`,`(..)`, and`(...)` conventions let you intercept navigation and show content in a modal overlay while preserving the URL. When a user clicks a task card, you can show the details in a modal. If they share the URL, the full page renders instead. This pattern powers Instagram-style photo views.
+
+Edge Runtime for latency-sensitive routes. Add`export const runtime = "edge"` to any page or API route to run it on Vercel’s Edge Network, Cloudflare Workers, or similar edge platforms. Edge functions start in under 1 ms compared to 200-300 ms for cold-start Node.js serverless functions. Use this for authentication middleware, A/B testing, and geolocation-based routing.
+
+React Cache for request-level deduplication. Wrap expensive data fetching functions with React’s`cache()` function to ensure the same data is only fetched once per request, even if multiple components call the same function. This is especially valuable in Server Components where you can’t use React Query or SWR.
+
+Partial Pre-rendering (PPR) for hybrid pages. This experimental feature combines static and dynamic rendering on a single page. The static shell (navigation, layout, above-the-fold content) is served instantly from the CDN, while dynamic holes (user-specific data, real-time content) stream in as they become available. Enable it with`experimental.ppr: true` in`next.config.ts`.
+
+## Complete Project Structure
+
+Here is the final directory structure of the TaskFlow application with every file we created in this tutorial:
+
+```
+taskflow/
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx              # Root layout with metadata + font
+│   │   ├── page.tsx                # Home page
+│   │   ├── globals.css             # Global styles + Tailwind
+│   │   ├── actions.ts              # Server Actions (create, update, delete)
+│   │   ├── api/
+│   │   │   └── tasks/
+│   │   │       ├── route.ts        # GET /api/tasks, POST /api/tasks
+│   │   │       └── [id]/
+│   │   │           └── route.ts    # GET/PATCH/DELETE /api/tasks/:id
+│   │   └── tasks/
+│   │       ├── layout.tsx          # Tasks section layout with nav
+│   │       ├── page.tsx            # Task list page
+│   │       ├── loading.tsx         # Loading skeleton
+│   │       ├── error.tsx           # Error boundary
+│   │       ├── new/
+│   │       │   └── page.tsx        # Create task form
+│   │       └── [id]/
+│   │           ├── page.tsx        # Task detail page
+│   │           └── delete-button.tsx # Client Component
+│   ├── lib/
+│   │   ├── types.ts                # TypeScript type definitions
+│   │   └── tasks.ts                # Data layer (CRUD operations)
+│   └── middleware.ts               # Auth + security headers
+├── public/
+├── next.config.ts
+├── tsconfig.json
+├── tailwind.config.ts
+├── Dockerfile
+└── package.json
+```
+
+This structure follows Next.js conventions precisely. The`app/` directory owns all routing. The`lib/` directory contains shared utilities and data access code. The`middleware.ts` sits at the`src/` root so it applies to all routes. Each route segment (`tasks/`,`tasks/[id]/`) is self-contained with its own page, loading, and error files.
+
+### Related Coverage
+
+For more on the tools and technologies used in this tutorial, see our related coverage:
+
+- How to Learn TypeScript from Scratch: Complete Beginner to Advanced Tutorial (2026)
+- How to Build a Dashboard with Tailwind CSS v4 in 14 Steps [2026]
+- Vercel vs Netlify 2026: The Leading Deployment Platform Comparison
+- Svelte vs React 2026: The Leading Front-End Framework Comparison
+- Angular vs React 2026: The Leading Front-End Framework Comparison
+- How to Get Started with Docker: Complete Beginner Tutorial (2026)
+- How to Build a CI/CD Pipeline with GitHub Actions: Complete Tutorial (2026)
+
+## Frequently Asked Questions
+
+### What is the difference between the App Router and Pages Router in Next.js?
+
+The App Router is the modern routing system built on React Server Components. It uses the`app/` directory, supports layouts, loading states, error boundaries, and server actions out of the box. The Pages Router uses the`pages/` directory and relies on`getServerSideProps` and`getStaticProps` for data fetching. The App Router is recommended for all new projects, while the Pages Router remains supported for existing applications.
+
+### Do I need to learn React before learning Next.js?
+
+Yes. Next.js is built on top of React and assumes you understand components, props, state, and hooks. You do not need to be a React expert – understanding the basics of functional components,`useState`, and`useEffect` is sufficient to follow this tutorial and build production applications.
+
+### Is Next.js free to use?
+
+Yes. Next.js is open-source software licensed under the MIT license. You can use it for personal and commercial projects without any cost. Vercel offers a free tier for hosting Next.js applications, but you are not required to use Vercel – you can deploy Next.js to any platform that supports Node.js, including AWS, Google Cloud, DigitalOcean, and self-hosted servers.
+
+### How does Next.js compare to other React frameworks like Remix or Gatsby?
+
+Next.js leads the React meta-framework space with the largest ecosystem, the most npm downloads – the`next` package logged roughly 8 million weekly downloads as of March 2026, per pkgpulse.com – and the broadest hosting support, with Next.js 16.2.7 cited as the current stable release by June 2026 according to abhs.in. Remix focuses on web standards and progressive enhancement with a simpler mental model. Gatsby has shifted focus to its cloud platform and is less commonly chosen for new projects. For most teams in 2026, Next.js offers the best combination of features, community support, and deployment flexibility.
+
+### Can I use Next.js with a database like PostgreSQL or MongoDB?
+
+Absolutely. Since Server Components and Server Actions run on the server, you can connect directly to any database. Popular choices include Prisma or Drizzle ORM with PostgreSQL, Mongoose with MongoDB, and Supabase for a managed PostgreSQL backend. The data layer in this tutorial uses an in-memory store that you can replace with any database driver or ORM.
+
+### What is Turbopack and should I use it?
+
+Turbopack is the Rust-based bundler that replaces webpack in Next.js. It became stable and enabled by default for the development server when Next.js 16 launched as the current LTS release on October 22, 2025, delivering significantly faster startup and hot module replacement; by April 2026 Next.js 16.2.0 was the latest stable build running on Turbopack, and endoflife.date still listed the Next.js 16 line as actively maintained as of August 2026. For production builds, Turbopack is also available as stable. Unless you have a specific webpack plugin that Turbopack does not support yet, use Turbopack for the best development experience.
+
+### How do I add authentication to a Next.js application?
+
+The most common approach is using NextAuth.js (now called Auth.js), which supports providers like Google, GitHub, email/password, and more. For managed solutions, Clerk and Auth0 offer drop-in authentication components. This tutorial shows a basic middleware-based auth pattern. For production applications, use a dedicated auth library that handles session management, token rotation, and security best practices.
+
+### Is Next.js suitable for large enterprise applications?
+
+Yes. Next.js powers enterprise applications at companies including Netflix, TikTok, Hulu, Nike, and Twitch. Its support for monorepos (via Turborepo), micro-frontends, incremental static regeneration, and edge middleware makes it well-suited for large-scale applications. The App Router’s layout and error boundary system enables teams to work on different route segments independently without conflicts.
+
+#### Nadia Dubois
+
+AI & Innovation Editor
+
+Nadia Dubois is the AI & Innovation Editor at Tech Insider, where she tracks the rapid evolution of artificial intelligence, from foundation models to real-world enterprise deployment. She previously covered AI and startups for La Tribune and contributed to MIT Technology Review's European coverage. Nadia specializes in generative AI, AI regulation, and the intersection of technology and European industrial policy. She holds a dual degree in Computational Linguistics and Journalism from Sciences Po Paris.
+
+TechInsider
+
+Tech Insider delivers in-depth coverage of the technologies shaping the future: AI, cybersecurity, cloud computing, hardware, and the trends that matter.
+
+#### Company
+
+#### Explore
+
+#### Categories
+
+© 2026 Tech Insider Media AB. All rights reserved.

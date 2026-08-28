@@ -14,7 +14,7 @@ import { computeDiscountPercent, parseMoney } from "@/lib/money";
 import {
   draftToDeal,
   emptyDraft,
-  publishDeal,
+  publishDealRemote,
   socialFromDraft,
 } from "@/lib/store";
 import type { DealCategory, DealDraft, ParsedDealPackage } from "@/lib/types";
@@ -141,7 +141,7 @@ export function AdminStudio() {
     }
   }
 
-  function onPublish() {
+  async function onPublish() {
     const next = {
       ...draft,
       dealUrl: draft.dealUrl.trim() || url.trim(),
@@ -157,17 +157,22 @@ export function AdminStudio() {
       return;
     }
 
-    const deal = publishDeal(draftToDeal(next));
-    toast.success("Deal posted");
-    router.push(`/deal/${deal.slug}`);
+    try {
+      const deal = await publishDealRemote(draftToDeal(next));
+      toast.success("Deal posted");
+      router.push(`/deal/${deal.slug}`);
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not post.");
+    }
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
       <div>
-        <h1 className="text-3xl font-black text-slate-900">Post a Deal</h1>
+        <h1 className="text-3xl font-black text-slate-900">Staff desk</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-500">
-          Paste a product link. We pull the store, photo, title, and price — then you hit Post.
+          Paste a product link. Title, photo, store, and price fill in. Readers never see this page.
         </p>
       </div>
 
@@ -287,10 +292,10 @@ export function AdminStudio() {
           </label>
           <button
             type="button"
-            onClick={onPublish}
+            onClick={() => void onPublish()}
             className="h-12 w-full rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700"
           >
-            Post Deal
+            Publish to site
           </button>
         </div>
 

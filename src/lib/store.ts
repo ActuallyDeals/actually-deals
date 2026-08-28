@@ -310,9 +310,23 @@ export function emptyDraft(): DealDraft {
 export function socialFromDraft(draft: DealDraft): string {
   return buildSocialPost({
     title: draft.title || "This deal",
+    merchantName: draft.merchantName,
     dealPrice: parseMoney(draft.dealPrice),
     msrp: parseMoney(draft.msrp),
     slug: draft.slug || slugify(draft.title) || "new-deal",
     couponCode: draft.couponCode || null,
   });
+}
+
+export async function publishDealRemote(deal: Deal): Promise<Deal> {
+  const response = await fetch("/api/deals", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(deal),
+  });
+  const payload = (await response.json()) as { deal?: Deal; error?: string };
+  if (!response.ok || !payload.deal) {
+    throw new Error(payload.error || "Could not publish the deal.");
+  }
+  return payload.deal;
 }

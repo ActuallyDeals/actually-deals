@@ -7,6 +7,8 @@ const LOGOS: Record<string, { bg: string; fg: string; mark: string }> = {
   "best-buy": { bg: "bg-[#0046BE]", fg: "text-[#FFF200]", mark: "bestbuy" },
   "home-depot": { bg: "bg-[#F96302]", fg: "text-white", mark: "homedepot" },
   costco: { bg: "bg-[#E31837]", fg: "text-white", mark: "costco" },
+  macys: { bg: "bg-[#E11A2C]", fg: "text-white", mark: "macys" },
+  "macy-s": { bg: "bg-[#E11A2C]", fg: "text-white", mark: "macys" },
 };
 
 function mark(kind: string) {

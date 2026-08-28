@@ -73,6 +73,28 @@ export function cleanProductTitle(title: string, merchantName: string): string {
   return next.trim();
 }
 
+export function displayDealTitle(input: {
+  title: string;
+  merchantName: string;
+  dealPrice: number | null;
+  msrp: number | null;
+}): string {
+  const name = input.title
+    .replace(/\s*[-–]\s*\$[\d,.]+.*$/i, "")
+    .replace(/\s+only\s+\$[\d,.]+.*$/i, "")
+    .replace(new RegExp(`\\s+at\\s+${input.merchantName}.*$`, "i"), "")
+    .trim();
+  const price = formatMoney(input.dealPrice);
+  const msrp = formatMoney(input.msrp);
+  if (price && msrp) {
+    return `${name} Only ${price} at ${input.merchantName} (Reg. ${msrp})`;
+  }
+  if (price) {
+    return `${name} Only ${price} at ${input.merchantName}`;
+  }
+  return name || `${input.merchantName} deal`;
+}
+
 export function buildHeadline(input: {
   title: string;
   merchantName?: string;
@@ -151,6 +173,7 @@ export function buildStackingSteps(input: {
 
 export function buildSocialPost(input: {
   title: string;
+  merchantName?: string;
   dealPrice: number | null;
   msrp: number | null;
   slug: string;
@@ -158,14 +181,33 @@ export function buildSocialPost(input: {
 }): string {
   const price = formatMoney(input.dealPrice);
   const msrp = formatMoney(input.msrp);
+  const store = (input.merchantName || "THE STORE").toUpperCase();
+  const name = input.title
+    .replace(/\s*[-–]\s*\$[\d,.]+.*$/i, "")
+    .replace(/\s+only\s+\$[\d,.]+.*$/i, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 8)
+    .join(" ")
+    .toUpperCase();
   const dealLink = publicDealUrl(input.slug);
-  const clip = input.couponCode ? `Use code ${input.couponCode}` : "See the listing for any coupon";
-  const line = price
+  const afterCode = input.couponCode ? " AFTER CODE" : "";
+  const hook = price
     ? msrp
-      ? `${input.title} is ${price} (was ${msrp})`
-      : `${input.title} is ${price}`
-    : input.title;
-  const post = `${line}\n\n${clip}\n${dealLink} #ad`;
+      ? `${msrp} ${name} NOW FOR ${price}${afterCode} @ ${store}`
+      : `${name} NOW FOR ${price}${afterCode} @ ${store}`
+    : `${name} @ ${store}`;
+  const compare = msrp
+    ? `Similar picks are going for no lower than ${msrp} at other retailers`
+    : "Check the listing before it sells out";
+  const how = input.couponCode
+    ? `Code ${input.couponCode} is applied automatically at checkout`
+    : "Clip the on-page coupon if one shows";
+  const ship =
+    input.merchantName === "Amazon"
+      ? "Free Prime shipping when eligible"
+      : "Free in store pick up if the store offers it";
+  const post = `${hook}\n\n${compare}\n\n${dealLink} #ad\n\n${how}\n\n${ship}`;
   return post.length <= 280 ? post : `${post.slice(0, 277)}...`;
 }
 
@@ -421,6 +463,7 @@ export async function parseDealUrl(rawUrl: string): Promise<ParsedDealPackage> {
     }),
     socialPost: buildSocialPost({
       title,
+      merchantName: preview.merchantName,
       dealPrice,
       msrp,
       slug,
