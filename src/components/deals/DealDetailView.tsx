@@ -5,11 +5,11 @@ import { useEffect, useState } from "react";
 
 import { AliveVoteBar } from "@/components/deals/AliveVoteBar";
 import { CommentThread } from "@/components/deals/CommentThread";
-import { CopyButton } from "@/components/deals/CopyButton";
+import { CouponModal } from "@/components/deals/CouponModal";
+import { GetDealButton } from "@/components/deals/GetDealButton";
 import { ProductImage } from "@/components/deals/ProductImage";
 import { StoreLogo } from "@/components/stores/StoreLogo";
 import { displayDealTitle } from "@/lib/deal-ingest";
-import { incrementClicks } from "@/lib/store";
 import { formatMoney } from "@/lib/money";
 import { formatRelativeTime } from "@/lib/time";
 import type { Deal } from "@/lib/types";
@@ -111,10 +111,12 @@ export function DealDetailView({
           ) : null}
 
           {deal.couponCode ? (
-            <div className="mt-4 flex items-center gap-2 rounded-xl bg-orange-50 px-3 py-2">
-              <span className="text-sm font-semibold text-slate-700">Code</span>
-              <code className="font-black text-orange-700">{deal.couponCode}</code>
-              <CopyButton value={deal.couponCode} />
+            <div className="mt-4">
+              <CouponModal
+                code={deal.couponCode}
+                merchantName={deal.merchantName}
+                dealUrl={deal.affiliateUrl || deal.dealUrl}
+              />
             </div>
           ) : null}
 
@@ -126,15 +128,12 @@ export function DealDetailView({
             ))}
           </ul>
 
-          <a
+          <GetDealButton
             href={deal.affiliateUrl || deal.dealUrl}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
-            onClick={() => incrementClicks(deal.id)}
-            className="mt-6 flex w-full items-center justify-center rounded-lg bg-emerald-600 py-3.5 text-sm font-bold text-white hover:bg-emerald-700"
-          >
-            Get Deal at {deal.merchantName}
-          </a>
+            dealId={deal.id}
+            label={`Get Deal at ${deal.merchantName}`}
+            className="mt-6 w-full py-3.5"
+          />
           <p className="mt-2 text-center text-[11px] text-slate-400">
             Affiliate link — we may earn a commission at no extra cost to you.
           </p>
@@ -162,15 +161,12 @@ export function DealDetailView({
       </div>
 
       <div className="sticky bottom-3 z-20 mt-8 lg:hidden">
-        <a
+        <GetDealButton
           href={deal.affiliateUrl || deal.dealUrl}
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-          onClick={() => incrementClicks(deal.id)}
-          className="flex w-full items-center justify-center rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-lg"
-        >
-          Get Deal at {deal.merchantName}
-        </a>
+          dealId={deal.id}
+          label={`Get Deal at ${deal.merchantName}`}
+          className="w-full shadow-lg"
+        />
       </div>
     </div>
   );

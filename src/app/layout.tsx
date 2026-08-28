@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} light h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col bg-orange-50 text-slate-900">
+      <body className="flex min-h-full flex-col bg-white text-slate-900">
         <Providers>
           <SiteHeader />
           <main className="flex-1">{children}</main>

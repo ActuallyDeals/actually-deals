@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { ProductImage } from "@/components/deals/ProductImage";
 import { StoreLogo } from "@/components/stores/StoreLogo";
 import { displayDealTitle } from "@/lib/deal-ingest";
-import { incrementClicks } from "@/lib/store";
+import { GetDealButton } from "@/components/deals/GetDealButton";
 import { formatMoney } from "@/lib/money";
 import { formatRelativeTime } from "@/lib/time";
 import type { Deal } from "@/lib/types";
@@ -102,23 +102,12 @@ export function DealCard({
           >
             See details
           </Link>
-          <a
-            href={deal.affiliateUrl || deal.dealUrl || "#"}
-            target={deal.dealUrl ? "_blank" : undefined}
-            rel={deal.dealUrl ? "noopener noreferrer nofollow" : undefined}
-            onClick={(event) => {
-              if (!deal.dealUrl) {
-                event.preventDefault();
-                return;
-              }
-              if (trackClicks) {
-                incrementClicks(deal.id);
-              }
-            }}
-            className="inline-flex flex-1 items-center justify-center rounded-lg bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-700"
-          >
-            Get Deal
-          </a>
+          <GetDealButton
+            href={deal.affiliateUrl || deal.dealUrl}
+            dealId={trackClicks ? deal.id : undefined}
+            label="Get Deal"
+            className="flex-1"
+          />
         </div>
       </div>
     </article>

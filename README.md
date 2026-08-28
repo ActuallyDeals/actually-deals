@@ -1,37 +1,34 @@
 # Actually Deals
 
-High-conversion deal desk for [actuallydeals.com](https://actuallydeals.com). Next.js 16 App Router, TypeScript, Tailwind, and a 1-paste admin studio.
+Deal blog for actuallydeals.com. You post. Readers click, vote, and comment.
 
-The homepage is a Slickdeals-style feed with Hip2Save card density, Dan's Deals three-bullet breakdowns, and Glitched Deals urgency pills. Outbound clicks use cleaned affiliate URLs. The parser never invents a sale price.
+## What is already built
 
-## What ships in this slice
+- Public feed and deal pages (The Freebie Guy / Hidden Clearances style)
+- Staff desk at `/admin` — paste a product link, edit, publish
+- Affiliate settings at `/admin/settings`
+- Coupon popup, alive/expired votes, comments
+- X/Twitter share copy generated for each deal
+- Amazon tag appended on Get Deal when you save it
 
-- Homepage grid with All / Price Errors / Coupon Stacks / Amazon filters and live search
-- Deal cards with merchant pills, giant emerald prices, copy-code buttons, and FTC line
-- Deal detail pages with stacking steps, alive/expired voting, and comments
-- Admin desk: paste a URL → clean ASIN/tracking → live card + tweet preview → publish
-- Local persistence so publishing, votes, and comments work before Supabase is connected
+Readers never see a “post a deal” button.
 
-The cards on first load are an editorial sample catalog so the desk can be reviewed. They are not live retailer quotes.
-
-## Run locally
+## Run it
 
 ```bash
 npm install
-cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://127.0.0.1:43147](http://127.0.0.1:43147).
+Open http://127.0.0.1:43147
 
-```bash
-npm run typecheck
-```
+Staff only: http://127.0.0.1:43147/admin
 
-## Affiliate tags
+## When you wake up — only you can do these
 
-If `NEXT_PUBLIC_AMAZON_AFFILIATE_TAG` is set, Amazon links become `https://www.amazon.com/dp/{ASIN}?tag=...`. Other merchants use optional network redirect templates. Missing keys fall back to the cleaned merchant URL.
+1. **Publish the site** with the Publish button in Cursor (Vercel). I cannot attach your domain or Amazon account for you.
+2. **Amazon Associates tag** — after Amazon approves you, open `/admin/settings` and paste `yourtag-20`.
+3. **X / Twitter** — I cannot post to your account without developer keys. Until then, copy the share text from the staff desk after you publish a deal.
+4. **WordPress + REHub** — skip unless you want to buy the paid REHub theme and WordPress hosting. This app is the same kind of deal portal without that purchase.
 
-## Architecture
-
-See `BLUEPRINT.md` for the full system contract and `DATABASE.md` for the PostgreSQL schema.
+Walmart / Target / Macy’s network links can be added the same way later. Until then those buttons go to the clean store URL.

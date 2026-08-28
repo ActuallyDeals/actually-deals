@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Search } from "lucide-react";
 
+import { SiteLogo } from "@/components/brand/SiteLogo";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -33,7 +34,7 @@ function HeaderSearch() {
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search deals"
-        className="h-10 w-full rounded-full border border-orange-100 bg-orange-50/50 pl-9 pr-3 text-sm outline-none focus:border-orange-400 focus:bg-white"
+        className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-green-500 focus:bg-white"
       />
     </form>
   );
@@ -41,18 +42,14 @@ function HeaderSearch() {
 
 export function SiteHeader() {
   const pathname = usePathname();
+  if (pathname.startsWith("/admin")) {
+    return null;
+  }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-orange-100 bg-white">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <span className="grid size-9 place-items-center rounded-lg bg-orange-500 text-sm font-black text-white">
-            AD
-          </span>
-          <span className="text-lg font-black tracking-tight text-slate-900">
-            Actually <span className="text-orange-500">Deals</span>
-          </span>
-        </Link>
+        <SiteLogo />
         <Suspense fallback={null}>
           <HeaderSearch />
         </Suspense>
@@ -62,7 +59,7 @@ export function SiteHeader() {
               key={link.href}
               href={link.href}
               className={cn(
-                "rounded-full px-3 py-1.5 text-slate-600 hover:bg-orange-50",
+                "rounded-full px-3 py-1.5 text-slate-600 hover:bg-slate-100",
                 pathname === "/" && link.href === "/" && "bg-slate-900 text-white hover:bg-slate-900",
               )}
             >
