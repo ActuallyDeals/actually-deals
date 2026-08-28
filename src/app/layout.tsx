@@ -18,12 +18,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://actuallydeals.com"),
   title: {
     default: "Actually Deals — Today's hottest freebies and price drops",
     template: "%s · Actually Deals",
   },
   description:
     "Today's best prices, coupon codes, and price drops. Click through to the store and confirm the total at checkout.",
+  openGraph: {
+    title: "Actually Deals",
+    description: "Today's hottest freebies and price drops.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
