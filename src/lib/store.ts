@@ -135,7 +135,9 @@ export function draftToDeal(draft: DealDraft): Deal {
     merchantName: draft.merchantName.trim() || "Merchant",
     dealUrl: draft.dealUrl.trim(),
     affiliateUrl: injectAffiliate(draft.dealUrl.trim()),
-    imageUrl: draft.imageUrl.trim(),
+    imageUrl:
+      draft.imageUrl.trim() ||
+      `data:image/svg+xml;charset=UTF-8,${encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg'/>")}`,
     dealPrice,
     msrp,
     discountPercent,
@@ -166,12 +168,21 @@ export function draftToDeal(draft: DealDraft): Deal {
   };
 }
 
+function uniqueSlug(base: string): string {
+  const existing = new Set(getAllDeals().map((deal) => deal.slug));
+  if (!existing.has(base)) {
+    return base;
+  }
+  return `${base}-${Date.now().toString(36).slice(-4)}`;
+}
+
 export function publishDeal(deal: Deal): Deal {
+  const next = { ...deal, slug: uniqueSlug(deal.slug) };
   const existing = loadPublishedDeals().filter(
-    (item) => item.id !== deal.id && item.slug !== deal.slug,
+    (item) => item.id !== next.id && item.slug !== next.slug,
   );
-  writeJson(DEALS_KEY, [deal, ...existing]);
-  return deal;
+  writeJson(DEALS_KEY, [next, ...existing]);
+  return next;
 }
 
 export function incrementClicks(dealId: string) {

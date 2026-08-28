@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { AdminStudio } from "@/components/admin/AdminStudio";
 
 export const metadata: Metadata = {
-  title: "Admin desk",
-  description: "Paste a product URL, generate the deal package, and publish.",
+  title: "Post a Deal",
+  description: "Paste a product link to fill the title, photo, and price.",
 };
 
 export default function AdminPage() {

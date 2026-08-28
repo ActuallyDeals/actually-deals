@@ -7,6 +7,8 @@ type DealPageProps = {
   params: Promise<{ slug: string }>;
 };
 
+export const dynamicParams = true;
+
 export function generateStaticParams() {
   return SEED_DEALS.map((deal) => ({ slug: deal.slug }));
 }

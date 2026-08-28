@@ -10,7 +10,7 @@ import { minutesAgo } from "@/lib/time";
 export const SEED_DEALS: Deal[] = [
   {
     id: "deal-anker-nano",
-    title: "Anker Nano USB-C Charger (30W) For Only $16.99 (Reg. $34.99) After 51% Off!",
+    title: "Anker Nano 30W USB-C Charger - $16.99",
     slug: "anker-nano-usb-c-charger-30w",
     merchantId: "merchant-amazon",
     merchantName: "Amazon",
@@ -70,7 +70,7 @@ export const SEED_DEALS: Deal[] = [
   },
   {
     id: "deal-sony-headphones",
-    title: "Sony WH-CH720N Noise Cancelling Headphones For Only $79.99 (Reg. $149.99)",
+    title: "Sony WH-CH720N Noise Cancelling Headphones - $79.99",
     slug: "sony-wh-ch720n-noise-cancelling",
     merchantId: "merchant-best-buy",
     merchantName: "Best Buy",
@@ -130,7 +130,7 @@ export const SEED_DEALS: Deal[] = [
   },
   {
     id: "deal-instant-pot",
-    title: "Instant Pot Duo 7-in-1 (6 Quart) For Only $59.00 (Reg. $119.99) After 51% Off!",
+    title: "Instant Pot Duo 7-in-1 6-Quart - $59",
     slug: "instant-pot-duo-6-quart",
     merchantId: "merchant-amazon",
     merchantName: "Amazon",
@@ -190,7 +190,7 @@ export const SEED_DEALS: Deal[] = [
   },
   {
     id: "deal-levis-501",
-    title: "Levi's 501 Original Jeans For Only $39.99 After TARGET15 Stack",
+    title: "Levi's 501 Original Jeans - $39.99 w/ Code",
     slug: "levis-501-original-target-stack",
     merchantId: "merchant-target",
     merchantName: "Target",
@@ -250,7 +250,7 @@ export const SEED_DEALS: Deal[] = [
   },
   {
     id: "deal-kitchenaid-glitch",
-    title: "KitchenAid Artisan Mixer Showing $79.99 — Confirm Before You Celebrate",
+    title: "KitchenAid Artisan Stand Mixer - $79.99",
     slug: "kitchenaid-artisan-price-mistake",
     merchantId: "merchant-walmart",
     merchantName: "Walmart",
@@ -310,7 +310,7 @@ export const SEED_DEALS: Deal[] = [
   },
   {
     id: "deal-milwaukee-stack",
-    title: "Milwaukee M18 Starter Kit For Only $99 After HOME20 Stack",
+    title: "Milwaukee M18 Starter Kit - $99 w/ Code",
     slug: "milwaukee-m18-starter-home-depot-stack",
     merchantId: "merchant-home-depot",
     merchantName: "Home Depot",
@@ -370,7 +370,7 @@ export const SEED_DEALS: Deal[] = [
   },
   {
     id: "deal-tide-freebie",
-    title: "Tide PODS Trial Size Drops to $0.00 After Store Coupon + Ibotta",
+    title: "Tide PODS Trial Size - FREE after rebate",
     slug: "tide-pods-trial-freebie",
     merchantId: "merchant-walmart",
     merchantName: "Walmart",
@@ -430,7 +430,7 @@ export const SEED_DEALS: Deal[] = [
   },
   {
     id: "deal-echo-dot",
-    title: "Echo Dot (5th Gen) For Only $22.99 (Reg. $49.99) After 54% Off!",
+    title: "Echo Dot 5th Gen - $22.99",
     slug: "echo-dot-5th-gen",
     merchantId: "merchant-amazon",
     merchantName: "Amazon",

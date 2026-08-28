@@ -7,9 +7,9 @@ import type { FeedFilter } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { id: FeedFilter; label: string }[] = [
-  { id: "all", label: "All Deals" },
-  { id: "price-errors", label: "Price Errors" },
-  { id: "coupon-stacks", label: "Coupon Stacks" },
+  { id: "all", label: "Frontpage" },
+  { id: "price-errors", label: "Price Drops" },
+  { id: "coupon-stacks", label: "Coupons" },
   { id: "amazon", label: "Amazon" },
 ];
 

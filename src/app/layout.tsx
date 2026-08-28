@@ -19,11 +19,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Actually Deals — Live prices, no invented markdown",
+    default: "Actually Deals — Hot deals from Amazon, Walmart, Target and more",
     template: "%s · Actually Deals",
   },
   description:
-    "High-trust deal breakdowns, coupon stacks, and price-mistake alerts. Affiliate links are disclosed. Prices are never invented when a retailer blocks a scrape.",
+    "Today's best prices, coupon codes, and price drops. Click through to the store and confirm the total at checkout.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
