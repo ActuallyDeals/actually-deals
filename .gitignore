@@ -43,3 +43,4 @@ next-env.d.ts
 
 # local published deals / comments
 /data/runtime.json
+agent-tools/
