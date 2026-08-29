@@ -4,7 +4,7 @@ Deal blog for actuallydeals.com. You post. Readers click, vote, and comment.
 
 ## What is already built
 
-- Public feed and deal pages (The Freebie Guy / Hidden Clearances style)
+- Public feed, deal pages, About, Disclosure, Privacy, sitemap, and RSS
 - Staff desk at `/admin` — paste a product link, edit, publish
 - Affiliate settings at `/admin/settings`
 - Coupon popup, alive/expired votes, comments
