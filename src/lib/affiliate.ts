@@ -154,10 +154,8 @@ export function injectAffiliate(rawUrl: string): string {
   }
 
   if (merchant.slug === "amazon") {
-    const tag = env("NEXT_PUBLIC_AMAZON_AFFILIATE_TAG");
-    if (tag) {
-      return withQuery(destination, { tag });
-    }
+    const tag = env("NEXT_PUBLIC_AMAZON_AFFILIATE_TAG") ?? "actuallydea07-20";
+    return withQuery(destination, { tag });
   }
 
   const networkTemplate =
