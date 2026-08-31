@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     type: "website",
   },
   other: {
-    "impact-site-verification": "941ec845-67fc-4606-bf2b-f3756259ba63",
+    "impact-site-verification": "b65b4c60-07b9-466f-b7bb-5b434e030171",
   },
 };
 
