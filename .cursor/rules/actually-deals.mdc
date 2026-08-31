@@ -1,0 +1,17 @@
+---
+description: Actually Deals product and architecture rules
+globs: ["**/*"]
+alwaysApply: true
+---
+
+Follow `BLUEPRINT.md` as the source of truth, then `docs/CONSTITUTION.md`, `docs/ARCHITECTURE.md`, and `docs/DATABASE.md`.
+
+- Persist deals, votes, and comments only through `src/lib/store.ts`.
+- Never use `next/image` for product photos. Use a standard `<img>` with the 3-tier resolver in `src/lib/images.ts`.
+- `/api/parse-deal` must stay merchant-tolerant: extract IDs from the URL even when the retailer blocks the scrape.
+- Strip tracking params and attach affiliate tags in `src/lib/affiliate.ts`. Do not leave `utm_*`, `pf_rd_*`, or click IDs on outbound links.
+- Amazon Associates Store ID is `actuallydea07-20` (`NEXT_PUBLIC_AMAZON_AFFILIATE_TAG` / `AFFILIATE_AMAZON_TAG`). Do not use `actuallydeals-20`.
+- Deal cards stay fully clickable without breaking nested Copy Code / Get Deal controls.
+- Do not add auth providers, extra component libraries, or a second database.
+- After behavior changes, keep `npx tsc --noEmit` and `npm run build` green.
+- House social: X `@actuallydeals`, Instagram `actuallydeals_` (underscore; URL `https://www.instagram.com/actuallydeals_/`), Facebook `ActuallyDeals`. Do not drop the Instagram underscore. Do not change the X handle or the domain `actuallydeals.com`. Use `src/lib/social.ts`.

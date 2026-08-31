@@ -1,24 +1,24 @@
 import { NextResponse } from "next/server";
+import { isAdmin } from "@/lib/auth";
+import { ParseDealError, parseDealUrl } from "@/lib/parse-deal";
 
-import { parseDealUrl } from "@/lib/deal-ingest";
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  let body: { url?: string };
-  try {
-    body = (await request.json()) as { url?: string };
-  } catch {
-    return NextResponse.json({ error: "Send JSON with a url field." }, { status: 400 });
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
-
   try {
-    const parsed = await parseDealUrl(body.url ?? "");
+    const body = (await request.json()) as { url?: string };
+    if (!body.url) {
+      return NextResponse.json({ error: "A product URL is required." }, { status: 400 });
+    }
+    const parsed = await parseDealUrl(body.url);
     return NextResponse.json(parsed);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Could not parse that URL.",
-      },
-      { status: 400 },
-    );
+    if (error instanceof ParseDealError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return NextResponse.json({ error: "Could not parse that deal." }, { status: 500 });
   }
 }

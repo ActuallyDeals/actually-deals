@@ -1,34 +1,40 @@
 # Actually Deals
 
-Deal blog for actuallydeals.com. You post. Readers click, vote, and comment.
+Human-verified shopping deals for [actuallydeals.com](https://actuallydeals.com). Editors parse a merchant URL, write a three-bullet summary, and publish. The community votes **Alive** vs **Expired** and leaves field reports.
 
-## What is already built
+Read `BLUEPRINT.md`, then `docs/PROJECT_STATUS.md` and `docs/AI_HANDOFF.md`.
 
-- Public feed, deal pages, About, Disclosure, Privacy, sitemap, and RSS
-- Staff desk at `/admin` — paste a product link, edit, publish
-- Affiliate settings at `/admin/settings`
-- Coupon popup, alive/expired votes, comments
-- X/Twitter share copy generated for each deal
-- Amazon tag appended on Get Deal when you save it
-
-Readers never see a “post a deal” button.
-
-## Run it
+## Run locally
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Open http://127.0.0.1:43147
+The app listens on [http://127.0.0.1:43127](http://127.0.0.1:43127).
 
-Staff only: http://127.0.0.1:43147/admin
+- Feed: `/`
+- Deal pages: `/deal/[slug]`
+- Editor desk: `/admin` (requires a real `ADMIN_PASSWORD`; no default) — paste a URL, edit overrides, publish or park in Incoming / Drafts / Ready
 
-## When you wake up — only you can do these
+## Persistence
 
-1. **Publish the site** with the Publish button in Cursor (Vercel). I cannot attach your domain or Amazon account for you.
-2. **Amazon Associates tag** — after Amazon approves you, open `/admin/settings` and paste `yourtag-20`.
-3. **X / Twitter** — I cannot post to your account without developer keys. Until then, copy the share text from the staff desk after you publish a deal.
-4. **WordPress + REHub** — skip unless you want to buy the paid REHub theme and WordPress hosting. This app is the same kind of deal portal without that purchase.
+When `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set, deals, votes, and comments write to Supabase.
 
-Walmart / Target / Macy’s network links can be added the same way later. Until then those buttons go to the clean store URL.
+1. Create a Supabase project.
+2. Run `supabase/migrations/001_init.sql`, `002_blueprint_fields.sql`, `003_queue_stage.sql`, and `004_price_mistakes_category.sql` in the SQL editor.
+3. Copy the project URL and service role key into `.env.local`.
+
+Without those keys the app uses a local file/memory store (`.data/store.json`) and ships a seed catalog so the feed is inspectable immediately.
+
+## Affiliate tags
+
+Amazon outbound links use Associates Store ID `actuallydea07-20` (`NEXT_PUBLIC_AMAZON_AFFILIATE_TAG` or `AFFILIATE_AMAZON_TAG`). Do not use `actuallydeals-20`. Other merchants: `AFFILIATE_WALMART_ID`, `AFFILIATE_TARGET_ID`, `AFFILIATE_HOMEDEPOT_ID`, `AFFILIATE_BESTBUY_ID`. Empty non-Amazon tags produce clean merchant URLs with tracking stripped.
+
+## Scripts
+
+```bash
+npx tsc --noEmit
+npm run build
+```

@@ -1,25 +1,27 @@
-type SupabaseLike = {
-  from: (table: string) => {
-    insert: (row: Record<string, unknown>) => Promise<{ error: Error | null }>;
-  };
-};
-
-function env(name: string): string | undefined {
-  const value = process.env[name];
-  return value && value.trim().length > 0 ? value.trim() : undefined;
-}
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(env("NEXT_PUBLIC_SUPABASE_URL") && env("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+  );
 }
 
-/**
- * Optional live client. Phase 1 persists to local storage.
- * When both public Supabase values are present, publish can also insert.
- */
-export function getSupabase(): SupabaseLike | null {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-  return null;
+export function persistenceMode(): "supabase" | "local" {
+  return isSupabaseConfigured() ? "supabase" : "local";
+}
+
+let cached: SupabaseClient | null = null;
+
+export function getSupabaseAdmin(): SupabaseClient | null {
+  if (!isSupabaseConfigured()) return null;
+  if (cached) return cached;
+  cached = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+    },
+  );
+  return cached;
 }

@@ -84,6 +84,7 @@ Build a zero-friction backend parser at `POST /api/parse-deal`:
    - **3-Bullet Summary:** Auto-construct Price, Shipping, and Action instructions.
    - **Social Post (X/Twitter):** High-urgency 280-char post formatted as:
      `🚨 PRICE DROP: [Item Name] is down to $[Price] (Was $[MSRP])! \n\nClip coupon on page \n\nGet it here: {DEAL_URL} #ad`
+   - **House accounts:** X `@actuallydeals`, Instagram `actuallydeals_` (URL `https://www.instagram.com/actuallydeals_/`), Facebook `ActuallyDeals`. Instagram requires the trailing underscore. Do not change the X handle or the domain `actuallydeals.com`.
 
 ---
 
@@ -91,7 +92,7 @@ Build a zero-friction backend parser at `POST /api/parse-deal`:
 
 Ensure every outbound deal click is monetized via environment variables:
 
-- **Amazon Associates:** Auto-append `?tag=${process.env.NEXT_PUBLIC_AMAZON_AFFILIATE_TAG}`.
+- **Amazon Associates:** Auto-append `?tag=actuallydea07-20` from `NEXT_PUBLIC_AMAZON_AFFILIATE_TAG` or `AFFILIATE_AMAZON_TAG` (same Store ID; default `actuallydea07-20`). Do not use `actuallydeals-20`.
 - **Walmart / Target / Best Buy / Home Depot:** Wrap destination URLs with affiliate network redirects (Impact, CJ, Rakuten, Sovrn/Mavely) when keys are present.
 - **Direct Fallback:** If no affiliate tag is configured, route cleanly to the raw cleaned merchant URL without breaking user experience.
 

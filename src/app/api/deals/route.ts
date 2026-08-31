@@ -1,32 +1,53 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { isAdmin } from "@/lib/auth";
+import { listPublishedDeals, listQueuedDeals, saveDeal } from "@/lib/store";
+import { MERCHANTS, type PublishDealInput } from "@/lib/types";
 
-import { listDeals, saveDeal } from "@/lib/server-db";
-import type { Deal } from "@/lib/types";
+export const runtime = "nodejs";
 
-export const dynamic = "force-dynamic";
-
-export async function GET() {
-  return NextResponse.json({ deals: listDeals() });
+export async function GET(request: Request) {
+  try {
+    const queue = new URL(request.url).searchParams.get("queue");
+    if (queue) {
+      if (!(await isAdmin())) {
+        return NextResponse.json({ error: "Sign in at /admin first." }, { status: 401 });
+      }
+      const deals = await listQueuedDeals();
+      return NextResponse.json({ deals });
+    }
+    const deals = await listPublishedDeals();
+    return NextResponse.json({ deals });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not load deals." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
-  let deal: Deal;
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Sign in at /admin first." }, { status: 401 });
+  }
+
   try {
-    deal = (await request.json()) as Deal;
-  } catch {
-    return NextResponse.json({ error: "Send a deal JSON body." }, { status: 400 });
+    const body = (await request.json()) as PublishDealInput;
+    if (!body.title?.trim() || !body.sourceUrl?.trim()) {
+      return NextResponse.json({ error: "Title and source URL are required." }, { status: 400 });
+    }
+    if (!MERCHANTS.includes(body.merchant)) {
+      return NextResponse.json({ error: "Unknown merchant." }, { status: 400 });
+    }
+    const deal = await saveDeal(body);
+    revalidatePath("/");
+    revalidatePath("/admin");
+    if (deal.status === "published") revalidatePath(`/deal/${deal.slug}`);
+    return NextResponse.json({ deal }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not save deal." },
+      { status: 400 },
+    );
   }
-
-  if (!deal?.title || !deal?.dealUrl || !deal?.slug) {
-    return NextResponse.json({ error: "Deal needs a title, link, and slug." }, { status: 400 });
-  }
-
-  const saved = saveDeal({
-    ...deal,
-    id: deal.id || crypto.randomUUID(),
-    createdAt: deal.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
-
-  return NextResponse.json({ deal: saved });
 }

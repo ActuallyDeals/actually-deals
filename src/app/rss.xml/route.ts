@@ -1,20 +1,19 @@
-import { listDeals } from "@/lib/server-db";
-import { displayDealTitle } from "@/lib/deal-ingest";
+import { listPublishedDeals } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const site = process.env.NEXT_PUBLIC_SITE_URL || "https://actuallydeals.com";
-  const items = listDeals()
+  const deals = await listPublishedDeals();
+  const items = deals
     .slice(0, 30)
     .map((deal) => {
-      const title = displayDealTitle(deal);
       return `<item>
-        <title><![CDATA[${title}]]></title>
+        <title><![CDATA[${deal.title}]]></title>
         <link>${site}/deal/${deal.slug}</link>
         <guid>${site}/deal/${deal.slug}</guid>
-        <pubDate>${new Date(deal.createdAt).toUTCString()}</pubDate>
-        <description><![CDATA[${deal.bullets.map((b) => b.text).join(" ")}]]></description>
+        <pubDate>${new Date(deal.publishedAt ?? deal.createdAt).toUTCString()}</pubDate>
+        <description><![CDATA[${deal.bullets.join(" ")}]]></description>
       </item>`;
     })
     .join("\n");
@@ -24,7 +23,7 @@ export async function GET() {
     <channel>
       <title>Actually Deals</title>
       <link>${site}</link>
-      <description>Today's hottest freebies and price drops</description>
+      <description>Human-verified shopping deals. Confirm the total at checkout.</description>
       ${items}
     </channel>
   </rss>`;

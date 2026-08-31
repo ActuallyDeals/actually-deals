@@ -1,23 +1,30 @@
-import type { Metadata } from "next";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
+import { AMAZON_ASSOCIATE_DISCLOSURE } from "@/lib/disclosures";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Affiliate disclosure",
+  description: "How Actually Deals is compensated when you use Get Deal.",
 };
 
 export default function DisclosurePage() {
   return (
-    <article className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="text-3xl font-black text-slate-900">Affiliate disclosure</h1>
-      <p className="mt-4 text-slate-600 leading-7">
-        Actually Deals is a participant in the Amazon Services LLC Associates Program and other
-        affiliate networks. If you click a Get Deal button and buy, we may earn a commission. You
-        do not pay extra.
-      </p>
-      <p className="mt-4 text-slate-600 leading-7">
-        We do not invent sale prices. If a retailer page cannot be read, the price stays blank until
-        it is typed from the live checkout screen. Always confirm tax, shipping, and any coupon
-        before you pay.
-      </p>
-    </article>
+    <div className="flex min-h-full flex-col bg-slate-100">
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 sm:px-6">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Affiliate disclosure</h1>
+        <p className="mt-4 text-base leading-relaxed text-slate-600">
+          Some Get Deal buttons are affiliate links. If you buy after clicking, we may earn a
+          commission. That does not change the price you pay. We still tell you to confirm the
+          checkout total because deals die fast.
+        </p>
+        <p className="mt-4 text-base leading-relaxed text-slate-600">{AMAZON_ASSOCIATE_DISCLOSURE}</p>
+        <p className="mt-4 text-base leading-relaxed text-slate-600">
+          This site is an independent deal blog. We are not Amazon, Walmart, Target, Home Depot, or
+          Best Buy.
+        </p>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }

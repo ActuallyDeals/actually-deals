@@ -34,13 +34,15 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local persistence fallback
+.data/
+
+# ephemeral agent scratch
+agent-tools/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# local published deals / comments
-/data/runtime.json
-agent-tools/

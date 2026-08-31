@@ -1,45 +1,31 @@
-import { Suspense } from "react";
-
-import { DealCard } from "@/components/deals/DealCard";
-import { DealFeed } from "@/components/deals/DealFeed";
-import { listDeals } from "@/lib/server-db";
+import { DealFeed } from "@/components/deal-feed";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
+import { listPublishedDeals } from "@/lib/store";
+import { FEED_FILTERS, type FeedFilter } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  const deals = listDeals();
-  const featured = deals[0];
+function parseFilter(value: string | string[] | undefined): FeedFilter {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return FEED_FILTERS.includes(raw as FeedFilter) ? (raw as FeedFilter) : "all";
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const deals = await listPublishedDeals();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-green-700">
-          Today&apos;s finds
-        </p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
-          The deals are actually good
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-500">
-          Hand-picked prices from Amazon, Walmart, Macy&apos;s, Target, and more. Confirm the
-          total at checkout — deals move fast.
-        </p>
-      </div>
-
-      {featured ? (
-        <div className="mb-8">
-          <DealCard deal={featured} featured />
-        </div>
-      ) : null}
-
-      <Suspense
-        fallback={
-          <div className="rounded-2xl border border-orange-100 bg-white px-6 py-16 text-center text-sm text-slate-500">
-            Loading deals…
-          </div>
-        }
-      >
-        <DealFeed initialDeals={deals.slice(1)} />
-      </Suspense>
+    <div className="flex min-h-full flex-col bg-slate-100">
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        <DealFeed deals={deals} initialFilter={parseFilter(params.filter)} />
+      </main>
+      <SiteFooter />
     </div>
   );
 }

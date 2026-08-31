@@ -1,116 +1,139 @@
+export const MERCHANTS = [
+  "amazon",
+  "walmart",
+  "target",
+  "home-depot",
+  "best-buy",
+  "other",
+] as const;
+
+export type Merchant = (typeof MERCHANTS)[number];
+
+export const DEAL_STATUSES = ["draft", "published", "expired"] as const;
+export type DealStatus = (typeof DEAL_STATUSES)[number];
+
+export const QUEUE_STAGES = ["incoming", "draft", "ready"] as const;
+export type QueueStage = (typeof QUEUE_STAGES)[number];
+
+export const VOTE_CHOICES = ["alive", "expired"] as const;
+export type VoteChoice = (typeof VOTE_CHOICES)[number];
+
 export const DEAL_CATEGORIES = [
   "amazon-finds",
   "tech",
   "home",
   "apparel",
-  "price-errors",
+  "price-mistakes",
   "freebies",
   "general",
 ] as const;
-
 export type DealCategory = (typeof DEAL_CATEGORIES)[number];
 
-export type FeedFilter = "all" | "price-errors" | "coupon-stacks" | "amazon";
+export const FEED_FILTERS = ["all", "price-mistakes", "coupons", "amazon"] as const;
+export type FeedFilter = (typeof FEED_FILTERS)[number];
 
-export type DealBulletKind = "price" | "shipping" | "action";
-
-export type DealBullet = {
-  kind: DealBulletKind;
-  label: string;
-  text: string;
-};
-
-export type StackingStep = {
+export interface StackingStep {
   step: number;
   title: string;
   detail: string;
-};
+}
 
-export type Deal = {
+export interface Deal {
   id: string;
-  title: string;
   slug: string;
-  merchantId: string | null;
-  merchantName: string;
-  dealUrl: string;
+  title: string;
+  merchant: Merchant;
+  merchantProductId: string | null;
+  sourceUrl: string;
   affiliateUrl: string;
+  scrapedImageUrl: string | null;
   imageUrl: string;
-  dealPrice: number | null;
-  msrp: number | null;
-  discountPercent: number | null;
-  couponCode: string | null;
-  bullets: DealBullet[];
-  stackingSteps: StackingStep[];
-  category: DealCategory;
-  isPriceError: boolean;
+  currentPrice: number;
+  listPrice: number | null;
+  promoCode: string | null;
+  isPriceMistake: boolean;
   isStackingHack: boolean;
   isFeatured: boolean;
-  isExpired: boolean;
-  upvotes: number;
-  downvotes: number;
-  clickCount: number;
-  postedBy: string;
+  category: DealCategory;
+  bullets: string[];
+  stackingSteps: StackingStep[];
+  socialPost: string | null;
+  summary: string | null;
+  status: DealStatus;
+  /** Staff desk only. Null once the deal is on the public feed. */
+  queueStage: QueueStage | null;
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
-};
+  aliveVotes: number;
+  expiredVotes: number;
+  commentCount: number;
+}
 
-export type Merchant = {
-  id: string;
-  name: string;
-  slug: string;
-  domain: string;
-  logoUrl: string | null;
-  emoji: string;
-  affiliateTemplate: string | null;
-};
-
-export type DealComment = {
+export interface DealComment {
   id: string;
   dealId: string;
   authorName: string;
-  content: string;
+  body: string;
   createdAt: string;
-};
+}
 
-export type DealVote = {
+export interface DealVote {
+  id: string;
   dealId: string;
-  isAlive: boolean;
-};
+  voterKey: string;
+  choice: VoteChoice;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export type ParsedDealPackage = {
+export interface ParsedDeal {
+  merchant: Merchant;
+  merchantProductId: string | null;
   sourceUrl: string;
-  cleanedUrl: string;
-  canonicalUrl: string;
-  merchantName: string;
-  merchantSlug: string;
-  asin: string | null;
+  affiliateUrl: string;
   title: string;
+  currentPrice: number | null;
+  listPrice: number | null;
+  scrapedImageUrl: string | null;
   imageUrl: string;
-  imageSource: "opengraph" | "amazon-cdn" | "fallback";
-  dealPrice: number | null;
-  msrp: number | null;
-  discountPercent: number | null;
-  couponCode: string | null;
-  headline: string;
-  bullets: DealBullet[];
+  imageTier: "scraped" | "cdn" | "placeholder";
+  bullets: string[];
   stackingSteps: StackingStep[];
   socialPost: string;
   pricesBlocked: boolean;
   scrapeNote: string | null;
-};
+}
 
-export type DealDraft = {
+export interface PublishDealInput {
   title: string;
-  slug: string;
-  merchantName: string;
-  dealUrl: string;
-  imageUrl: string;
-  dealPrice: string;
-  msrp: string;
-  couponCode: string;
-  category: DealCategory;
-  isPriceError: boolean;
-  isStackingHack: boolean;
-  isFeatured: boolean;
-  socialPost: string;
-};
+  merchant: Merchant;
+  merchantProductId?: string | null;
+  sourceUrl: string;
+  affiliateUrl?: string;
+  scrapedImageUrl?: string | null;
+  imageUrl?: string;
+  currentPrice?: number | null;
+  listPrice?: number | null;
+  promoCode?: string | null;
+  isPriceMistake?: boolean;
+  isStackingHack?: boolean;
+  isFeatured?: boolean;
+  category?: DealCategory;
+  bullets: string[];
+  stackingSteps?: StackingStep[];
+  socialPost?: string | null;
+  summary?: string | null;
+  status?: DealStatus;
+  queueStage?: QueueStage | null;
+}
+
+export function isCommunityExpired(deal: Deal): boolean {
+  const total = deal.aliveVotes + deal.expiredVotes;
+  return total > 0 && deal.expiredVotes / total > 0.7;
+}
+
+export function percentOff(deal: Pick<Deal, "currentPrice" | "listPrice">): number | null {
+  if (!deal.listPrice || deal.listPrice <= deal.currentPrice) return null;
+  return Math.round(((deal.listPrice - deal.currentPrice) / deal.listPrice) * 100);
+}

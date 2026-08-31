@@ -1,47 +1,79 @@
-"use client";
+import Link from "next/link";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
+import { isAdmin, isAdminConfigured } from "@/lib/auth";
+import { affiliateTags } from "@/lib/affiliate";
+import { AdminLogin, AdminUnauthorized } from "@/components/admin-login";
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+export const dynamic = "force-dynamic";
 
-import { getAmazonTag, setAmazonTag } from "@/lib/affiliate-client";
+function status(value: string): string {
+  return value ? "Set on this server" : "Not set — Get Deal uses a clean merchant URL";
+}
 
-export default function SettingsPage() {
-  const [tag, setTag] = useState("");
+export default async function AdminSettingsPage() {
+  if (!isAdminConfigured()) {
+    return (
+      <div className="flex min-h-full flex-col bg-slate-100">
+        <SiteHeader admin />
+        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+          <AdminUnauthorized />
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    setTag(getAmazonTag());
-  }, []);
+  const signedIn = await isAdmin();
+  const tags = signedIn ? affiliateTags() : null;
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-2xl font-black text-slate-900">Affiliate settings</h1>
-      <p className="mt-2 text-sm text-slate-500">
-        Paste your Amazon Associates tag. Every Amazon Get Deal click will append it. Other stores
-        use the raw product link until you add those networks later.
-      </p>
-      <label className="mt-6 block text-sm font-semibold text-slate-800">
-        Amazon tag
-        <input
-          value={tag}
-          onChange={(event) => setTag(event.target.value)}
-          placeholder="yourtag-20"
-          className="mt-1 h-11 w-full rounded-lg border border-slate-200 px-3"
-        />
-      </label>
-      <button
-        type="button"
-        onClick={() => {
-          setAmazonTag(tag);
-          toast.success("Amazon tag saved on this browser");
-        }}
-        className="mt-4 rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700"
-      >
-        Save
-      </button>
-      <p className="mt-6 text-xs leading-5 text-slate-400">
-        X / Twitter cannot post by itself until you create a developer app and send those keys.
-        Until then, copy the share post from the staff desk.
-      </p>
+    <div className="flex min-h-full flex-col bg-slate-100">
+      <SiteHeader admin />
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+        {signedIn && tags ? (
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-xl font-semibold text-slate-950">Affiliate settings</h1>
+              <Link href="/admin" className="text-sm font-medium text-emerald-700">
+                Back to the desk
+              </Link>
+            </div>
+            <p className="text-sm text-slate-500">
+              Tags are environment variables. This page cannot write Vercel secrets. Amazon defaults
+              to Store ID <code>actuallydea07-20</code>. Other empty tags stay clean merchant links.
+            </p>
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="font-semibold text-slate-900">Amazon</dt>
+                <dd className="text-slate-600">
+                  {status(tags.amazon)} · Store ID <code>actuallydea07-20</code> via{" "}
+                  <code>NEXT_PUBLIC_AMAZON_AFFILIATE_TAG</code> or <code>AFFILIATE_AMAZON_TAG</code>
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-900">Walmart</dt>
+                <dd className="text-slate-600">{status(tags.walmart)}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-900">Target</dt>
+                <dd className="text-slate-600">{status(tags.target)}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-900">Home Depot</dt>
+                <dd className="text-slate-600">{status(tags["home-depot"])}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-900">Best Buy</dt>
+                <dd className="text-slate-600">{status(tags["best-buy"])}</dd>
+              </div>
+            </dl>
+          </section>
+        ) : (
+          <AdminLogin />
+        )}
+      </main>
+      <SiteFooter />
     </div>
   );
 }
