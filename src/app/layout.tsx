@@ -30,6 +30,9 @@ export const metadata: Metadata = {
     description: "Today's hottest freebies and price drops.",
     type: "website",
   },
+  other: {
+    "impact-site-verification": "941ec845-67fc-4606-bf2b-f3756259ba63",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
