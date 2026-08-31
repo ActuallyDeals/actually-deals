@@ -2,12 +2,12 @@ const TAG_KEY = "actually-deals:amazon-tag";
 
 export function getAmazonTag(): string {
   if (typeof window === "undefined") {
-    return process.env.NEXT_PUBLIC_AMAZON_AFFILIATE_TAG?.trim() || "";
+    return process.env.NEXT_PUBLIC_AMAZON_AFFILIATE_TAG?.trim() || "actuallydea07-20";
   }
   return (
     window.localStorage.getItem(TAG_KEY)?.trim() ||
     process.env.NEXT_PUBLIC_AMAZON_AFFILIATE_TAG?.trim() ||
-    ""
+    "actuallydea07-20"
   );
 }
 
