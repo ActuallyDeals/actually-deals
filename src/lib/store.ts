@@ -446,6 +446,12 @@ function validateDealInput(input: PublishDealInput): void {
   if (input.currentPrice == null || !Number.isFinite(input.currentPrice) || input.currentPrice < 0) {
     throw new Error("Current price is required to publish. Do not invent one.");
   }
+  if (input.listPrice == null || !Number.isFinite(input.listPrice) || input.listPrice <= 0) {
+    throw new Error("Was-price / list price is required to publish. Copy it from the listing.");
+  }
+  if (input.listPrice <= input.currentPrice) {
+    throw new Error("List price cannot be the same as or lower than the deal price. Fix the was-price before you post.");
+  }
 }
 
 export async function publishDeal(input: PublishDealInput): Promise<Deal> {

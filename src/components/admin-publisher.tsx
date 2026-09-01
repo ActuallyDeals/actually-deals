@@ -18,6 +18,13 @@ import {
   parseSocialDrafts,
   serializeSocialDrafts,
 } from "@/lib/copy-engine";
+import {
+  inferStackFromTitle,
+  productNameFromTitle,
+  rewritePastedDeal,
+  stackedBullets,
+  stackedHeadline,
+} from "@/lib/stack-copy";
 import { boxesToStackingSteps, staffWriteupBoxes, writeupReady } from "@/lib/editorial";
 import { withHttps } from "@/lib/affiliate";
 import { isBrandedPlaceholder } from "@/lib/images";
@@ -31,6 +38,7 @@ import {
   type ParsedDeal,
   type PublishDealInput,
   type QueueStage,
+  isDeadListing,
 } from "@/lib/types";
 
 const EMPTY_BULLETS = ["", "", ""];
@@ -45,6 +53,9 @@ interface Draft {
   promoCode: string;
   isPriceMistake: boolean;
   isStackingHack: boolean;
+  clipCoupon: boolean;
+  subscribeSave: boolean;
+  pasteCopy: string;
   isFeatured: boolean;
   category: DealCategory;
   bullets: string[];
@@ -71,6 +82,9 @@ const emptyDraft: Draft = {
   promoCode: "",
   isPriceMistake: false,
   isStackingHack: false,
+  clipCoupon: false,
+  subscribeSave: false,
+  pasteCopy: "",
   isFeatured: false,
   category: "general",
   bullets: [...EMPTY_BULLETS],
@@ -105,6 +119,9 @@ function dealToDraft(deal: Deal): Draft {
     promoCode: deal.promoCode ?? "",
     isPriceMistake: deal.isPriceMistake,
     isStackingHack: deal.isStackingHack,
+    clipCoupon: inferStackFromTitle(deal.title).clipCoupon,
+    subscribeSave: inferStackFromTitle(deal.title).subscribeSave,
+    pasteCopy: "",
     isFeatured: deal.isFeatured,
     category: deal.category,
     bullets: [deal.bullets[0] ?? "", deal.bullets[1] ?? "", deal.bullets[2] ?? ""],
@@ -237,12 +254,50 @@ function SocialDraftBox({
   );
 }
 
+function applyStackToDraft(current: Draft, patch: Partial<Draft> = {}): Draft {
+  const next: Draft = { ...current, ...patch };
+  const live = priceNumber(next.currentPrice);
+  const list = priceNumber(next.listPrice);
+  const stacking = next.clipCoupon || next.subscribeSave || Boolean(next.promoCode.trim());
+  next.isStackingHack = stacking;
+  if (stacking) {
+    next.title = stackedHeadline({
+      title: next.title,
+      merchant: next.merchant,
+      currentPrice: live,
+      clipCoupon: next.clipCoupon,
+      subscribeSave: next.subscribeSave,
+      promoCode: next.promoCode,
+    });
+    const generic =
+      !current.bullets[0] ||
+      /do not guess|see the live price|clip the on-page|subscribe & save|confirm the total/i.test(
+        current.bullets[0],
+      );
+    if (live != null && generic) {
+      next.bullets = stackedBullets({
+        merchant: next.merchant,
+        currentPrice: live,
+        listPrice: list,
+        clipCoupon: next.clipCoupon,
+        subscribeSave: next.subscribeSave,
+        promoCode: next.promoCode,
+      });
+    }
+  } else {
+    next.title = productNameFromTitle(next.title);
+  }
+  return next;
+}
+
 export function AdminPublisher({
   persistence,
   queued,
+  live,
 }: {
   persistence: "supabase" | "local";
   queued: Deal[];
+  live: Deal[];
 }) {
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -266,6 +321,11 @@ export function AdminPublisher({
   const preview = useMemo(() => draftToDeal(draft), [draft]);
   const placeholderPhoto = isBrandedPlaceholder(draft.imageUrl);
   const needsPrice = priceNumber(draft.currentPrice) == null;
+  const listValue = priceNumber(draft.listPrice);
+  const liveValue = priceNumber(draft.currentPrice);
+  const needsList =
+    listValue == null || listValue <= 0 || (liveValue != null && listValue <= liveValue);
+  const editingLive = Boolean(editingSlug && live.some((item) => item.slug === editingSlug));
   const needsPhoto = placeholderPhoto || !draft.imageUrl;
   const scrapeIncomplete = Boolean(draft.sourceUrl) && (needsPrice || needsPhoto);
   const notesReady = writeupReady(draft.summary, draft.stackNote, draft.verifyNote);
@@ -459,6 +519,18 @@ export function AdminPublisher({
       whyRef.current?.focus();
       return;
     }
+    if (status === "published") {
+      const pay = priceNumber(draft.currentPrice);
+      const was = priceNumber(draft.listPrice);
+      if (was == null || was <= 0) {
+        setError("Was-price / list price is required to publish. Copy it from the listing.");
+        return;
+      }
+      if (pay != null && was <= pay) {
+        setError("List price cannot be the same as or lower than the deal price. Fix the was-price.");
+        return;
+      }
+    }
     setSaving(label);
     setError(null);
     setNotice(null);
@@ -472,8 +544,12 @@ export function AdminPublisher({
       const payload = (await response.json()) as { error?: string; deal?: Deal };
       if (!response.ok || !payload.deal) throw new Error(payload.error || "Save failed.");
       if (status === "published") {
-        toast.success("Deal posted");
-        router.push(`/deal/${payload.deal.slug}`);
+        toast.success(editingLive ? "Live deal updated" : "Deal posted");
+        if (editingLive) {
+          setNotice("Updated the live deal. Still not auto-posted to social.");
+        } else {
+          router.push(`/deal/${payload.deal.slug}`);
+        }
       } else {
         toast.success(`Saved to ${queueStage}`);
         setEditingSlug(payload.deal.slug);
@@ -500,7 +576,12 @@ export function AdminPublisher({
     setIgDraftLocked(Boolean(social.instagram.trim()));
     setFbDraftLocked(Boolean(social.facebook.trim()));
     setError(null);
-    setNotice(`Editing ${deal.queueStage} item.`);
+    const liveHit = deal.status === "published" || deal.status === "expired";
+    setNotice(
+      liveHit
+        ? `Editing live deal${isDeadListing(deal) ? " (Dead)" : ""}. Save updates the public card.`
+        : `Editing ${deal.queueStage} item.`,
+    );
     window.setTimeout(() => {
       if (!deal.currentPrice) priceRef.current?.focus();
       else if (isBrandedPlaceholder(deal.imageUrl)) imageRef.current?.focus();
@@ -584,27 +665,58 @@ export function AdminPublisher({
 
   function applyStaffPrice(field: "currentPrice" | "listPrice", value: string) {
     setDraft((current) => {
-      const next = {
-        ...current,
+      const next = applyStackToDraft(current, {
         [field]: value,
         pricesBlocked: field === "currentPrice" ? priceNumber(value) == null : current.pricesBlocked,
-      };
-      const live = priceNumber(next.currentPrice);
+      });
+      const pay = priceNumber(next.currentPrice);
       const list = priceNumber(next.listPrice);
       const genericBullet =
         !current.bullets[0] ||
         /do not guess|see the live price/i.test(current.bullets[0]);
-      if (live != null && genericBullet) {
+      if (pay != null && genericBullet && !next.clipCoupon && !next.subscribeSave) {
         next.bullets = buildDanBullets({
           merchant: current.merchant,
-          currentPrice: live,
+          currentPrice: pay,
           listPrice: list,
-          percentOff: discountPercent(live, list),
+          percentOff: discountPercent(pay, list),
           promoCode: current.promoCode || null,
         });
       }
       return next;
     });
+  }
+
+  function applyPastedRewrite() {
+    const rewritten = rewritePastedDeal(draft.pasteCopy, {
+      title: draft.title,
+      merchant: draft.merchant,
+      currentPrice: draft.currentPrice,
+      listPrice: draft.listPrice,
+      promoCode: draft.promoCode,
+    });
+    setDraft((current) => {
+      const next = applyStackToDraft(current, {
+        clipCoupon: rewritten.clipCoupon,
+        subscribeSave: rewritten.subscribeSave,
+        promoCode: rewritten.promoCode,
+        currentPrice: rewritten.currentPrice,
+        listPrice: rewritten.listPrice,
+        stackNote: [
+          rewritten.clipCoupon ? "Clip the on-page coupon." : "",
+          rewritten.subscribeSave ? "Turn on Subscribe & Save." : "",
+          rewritten.promoCode ? `Code ${rewritten.promoCode} at checkout.` : "",
+        ]
+          .filter(Boolean)
+          .join(" ") || current.stackNote,
+        verifyNote: rewritten.currentPrice
+          ? `Cart should match $${rewritten.currentPrice} after the stack. Skip it if it does not.`
+          : current.verifyNote,
+      });
+      next.bullets = rewritten.bullets;
+      return next;
+    });
+    setNotice("Rewrote into our bullets. Check the numbers against the live listing.");
   }
 
   return (
@@ -692,6 +804,43 @@ export function AdminPublisher({
             ))
           )}
         </ul>
+        <div className="mt-5 border-t border-slate-200 pt-4">
+          <h2 className="text-sm font-semibold text-slate-950">Live</h2>
+          <p className="mt-1 text-xs text-slate-500">Published and Dead. Click to edit, then Save.</p>
+          <ul className="mt-3 space-y-2">
+            {live.length === 0 ? (
+              <li className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-400">
+                Nothing live yet.
+              </li>
+            ) : (
+              live.map((item) => {
+                const dead = isDeadListing(item);
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => loadQueued(item)}
+                      className={`w-full rounded-xl border px-3 py-2 text-left ${
+                        editingSlug === item.slug
+                          ? "border-emerald-300 bg-emerald-50"
+                          : dead
+                            ? "border-slate-200 bg-slate-100"
+                            : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <span className="block text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                        {dead ? "Dead" : "Live"}
+                      </span>
+                      <span className={`mt-0.5 line-clamp-2 text-xs font-semibold ${dead ? "text-slate-500" : "text-slate-900"}`}>
+                        {item.title}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
       </aside>
 
       <div className="space-y-4">
@@ -699,10 +848,12 @@ export function AdminPublisher({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-semibold text-slate-950">
-                {editingSlug ? "Edit queued deal" : "Paste a retailer URL"}
+                {editingLive ? "Edit live deal" : editingSlug ? "Edit queued deal" : "Paste a retailer URL"}
               </h1>
               <p className="mt-1 text-sm text-slate-500">
-                Paste first. Preview fills from the listing. Write three short notes, then Ready. Mike publishes.
+                {editingLive
+                  ? "Save updates the public card. Social stays copy-only until you post it."
+                  : "Paste first. Preview fills from the listing. Write three short notes, then Ready. Mike publishes."}
               </p>
             </div>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
@@ -766,6 +917,10 @@ export function AdminPublisher({
               priceRef.current?.focus();
               return;
             }
+            if (needsList) {
+              setError("Was-price / list price is required, and it has to be higher than the deal price.");
+              return;
+            }
             void save("published", null, "publish");
           }}
         >
@@ -787,6 +942,18 @@ export function AdminPublisher({
                     className="border-red-400 bg-white ring-2 ring-red-200"
                   />
                   <p className="text-xs font-medium text-red-700">Copy the number on the page. Do not guess.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="list-price-urgent">Was / list price</Label>
+                  <Input
+                    id="list-price-urgent"
+                    inputMode="decimal"
+                    value={draft.listPrice}
+                    onChange={(event) => applyStaffPrice("listPrice", event.target.value)}
+                    placeholder="e.g. 4.99"
+                    className="border-red-400 bg-white ring-2 ring-red-200"
+                  />
+                  <p className="text-xs font-medium text-red-700">The crossed-out price on the listing. Required to publish.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="image">Image URL</Label>
@@ -830,6 +997,48 @@ export function AdminPublisher({
               <p className="mt-0.5 text-xs text-slate-500">
                 Required before Ready. Placeholders stay empty — do not paste merchant copy.
               </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paste-copy">Paste someone else&apos;s writeup</Label>
+              <Textarea
+                id="paste-copy"
+                value={draft.pasteCopy}
+                onChange={(event) => setDraft({ ...draft, pasteCopy: event.target.value })}
+                placeholder="Drop a Slickdeals / X / blog blurb. We keep the numbers and rewrite the how-to in our words."
+                className="min-h-20 bg-white"
+              />
+              <button
+                type="button"
+                className="text-xs font-semibold text-emerald-700 disabled:text-slate-400"
+                disabled={!draft.pasteCopy.trim()}
+                onClick={applyPastedRewrite}
+              >
+                Rewrite as ours
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-4 text-sm font-medium text-slate-800">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={draft.clipCoupon}
+                  onChange={(event) =>
+                    setDraft((current) => applyStackToDraft(current, { clipCoupon: event.target.checked }))
+                  }
+                  className="size-4 accent-blue-600"
+                />
+                Clip coupon (AC)
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={draft.subscribeSave}
+                  onChange={(event) =>
+                    setDraft((current) => applyStackToDraft(current, { subscribeSave: event.target.checked }))
+                  }
+                  className="size-4 accent-blue-600"
+                />
+                Subscribe &amp; Save (SnS)
+              </label>
             </div>
             <div className="space-y-2">
               <Label htmlFor="summary">Why this is good</Label>
@@ -1029,7 +1238,9 @@ export function AdminPublisher({
                 <Input
                   id="code"
                   value={draft.promoCode}
-                  onChange={(event) => setDraft({ ...draft, promoCode: event.target.value })}
+                  onChange={(event) =>
+                    setDraft((current) => applyStackToDraft(current, { promoCode: event.target.value }))
+                  }
                   className="bg-white"
                 />
               </div>
@@ -1140,14 +1351,20 @@ export function AdminPublisher({
 
           <Button
             type="submit"
-            disabled={Boolean(saving) || needsPrice}
+            disabled={Boolean(saving) || needsPrice || needsList}
             className="h-12 w-full bg-emerald-600 text-base font-bold text-white hover:bg-emerald-700"
           >
             {saving === "publish"
-              ? "Publishing…"
+              ? editingLive
+                ? "Saving…"
+                : "Publishing…"
               : needsPrice
                 ? "Paste a live price to publish"
-                : "Publish to the site"}
+                : needsList
+                  ? "Paste a was-price higher than the deal"
+                  : editingLive
+                    ? "Save live deal"
+                    : "Publish to the site"}
           </Button>
           <p className="text-center text-xs text-slate-400">
             Publish is Mike&apos;s click. Ready only parks it for him.

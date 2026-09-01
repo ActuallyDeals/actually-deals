@@ -3,7 +3,7 @@ import { AdminPublisher } from "@/components/admin-publisher";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { isAdmin, isAdminConfigured } from "@/lib/auth";
-import { listQueuedDeals } from "@/lib/store";
+import { listPublishedDeals, listQueuedDeals } from "@/lib/store";
 import { persistenceMode } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,7 @@ export default async function AdminPage() {
 
   const signedIn = await isAdmin();
   const queued = signedIn ? await listQueuedDeals() : [];
+  const live = signedIn ? await listPublishedDeals() : [];
 
   return (
     <div className="flex min-h-full flex-col bg-slate-100">
@@ -35,7 +36,7 @@ export default async function AdminPage() {
                 Affiliate settings
               </a>
             </div>
-            <AdminPublisher persistence={persistenceMode()} queued={queued} />
+            <AdminPublisher persistence={persistenceMode()} queued={queued} live={live} />
           </div>
         ) : (
           <AdminLogin />
