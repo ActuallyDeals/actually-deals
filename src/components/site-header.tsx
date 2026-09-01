@@ -18,9 +18,6 @@ export function SiteHeader({ admin = false }: { admin?: boolean }) {
           <Link href="/?filter=amazon" className="hover:text-slate-950">
             Amazon
           </Link>
-          <Link href="/learn" className="hidden hover:text-slate-950 sm:inline">
-            Learn
-          </Link>
           <Link href="/contact" className="hidden hover:text-slate-950 sm:inline">
             Contact
           </Link>

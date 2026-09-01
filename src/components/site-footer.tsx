@@ -11,12 +11,6 @@ export function SiteFooter() {
             Deals that are actually good!
           </p>
           <div className="flex flex-wrap gap-4">
-            <Link href="/about" className="hover:text-slate-900">
-              About
-            </Link>
-            <Link href="/learn" className="hover:text-slate-900">
-              Learn
-            </Link>
             <Link href="/disclosure" className="hover:text-slate-900">
               Disclosure
             </Link>

@@ -29,15 +29,7 @@ export default function AboutPage() {
           match, vote Expired.
         </p>
         <p className="mt-4 text-base leading-relaxed text-slate-600">
-          Longer versions of the house rules live under Learn:{" "}
-          <Link href="/learn/how-we-pick" className="font-medium text-emerald-700 hover:underline">
-            how we pick a deal
-          </Link>{" "}
-          and{" "}
-          <Link href="/learn/how-stacking-works" className="font-medium text-emerald-700 hover:underline">
-            how stacking works
-          </Link>
-          . Compensation for outbound clicks is on the{" "}
+          Compensation for outbound clicks is on the{" "}
           <Link href="/disclosure" className="font-medium text-emerald-700 hover:underline">
             disclosure
           </Link>{" "}
