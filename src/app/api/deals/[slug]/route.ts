@@ -1,6 +1,8 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
+import { isCouponOnlyDeal } from "@/lib/outbound";
+import { autoPostSocial } from "@/lib/social-post";
 import { getDealBySlug, listComments, saveDeal } from "@/lib/store";
 import { MERCHANTS, type PublishDealInput } from "@/lib/types";
 
@@ -37,17 +39,30 @@ export async function PATCH(
   const { slug } = await context.params;
   try {
     const body = (await request.json()) as PublishDealInput;
-    if (!body.title?.trim() || !body.sourceUrl?.trim()) {
+    const couponOnly = isCouponOnlyDeal({
+      promoCode: body.promoCode,
+      sourceUrl: body.sourceUrl,
+      merchant: body.merchant,
+    });
+    if (!body.title?.trim() || (!couponOnly && !body.sourceUrl?.trim())) {
       return NextResponse.json({ error: "Title and source URL are required." }, { status: 400 });
     }
     if (!MERCHANTS.includes(body.merchant)) {
       return NextResponse.json({ error: "Unknown merchant." }, { status: 400 });
     }
+    const existing = await getDealBySlug(slug);
     const deal = await saveDeal(body, slug);
     revalidatePath("/");
     revalidatePath("/admin");
     if (deal.status === "published") revalidatePath(`/deal/${deal.slug}`);
-    return NextResponse.json({ deal });
+    let socialError: string | undefined;
+    let socialPosted: string[] | undefined;
+    if (deal.status === "published" && existing?.status !== "published") {
+      const social = await autoPostSocial(deal);
+      socialPosted = social.posted;
+      socialError = social.error ?? undefined;
+    }
+    return NextResponse.json({ deal, socialError, socialPosted });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Could not update deal." },

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { attachAffiliate, cleanTrackingParams, withHttps } from "../src/lib/affiliate.ts";
-import { imageFallbackChain, resolveDealImage } from "../src/lib/images.ts";
+import { imageFallbackChain, isBrandedPlaceholder, resolveDealImage } from "../src/lib/images.ts";
+import { extractRetailerCandidates } from "../src/lib/ingest-roundup.ts";
 import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
+import { isCouponOnlyDeal, isDirectRetailerListing } from "../src/lib/outbound.ts";
+import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
 
 assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ2KWHS");
 assert.equal(extractMerchantProductId(withHttps("amazon.com/dp/B08PQ2KWHS"), "amazon"), "B08PQ2KWHS");
@@ -60,5 +63,50 @@ const placeholder = resolveDealImage({
   merchantProductId: "14898365",
 });
 assert.equal(placeholder.imageTier, "placeholder");
+
+
+const amazonCdn = resolveDealImage({
+  scrapedImageUrl: null,
+  merchant: "amazon",
+  merchantProductId: "B08PQ2KWHS",
+});
+assert.equal(amazonCdn.imageTier, "cdn");
+assert.equal(isBrandedPlaceholder(amazonCdn.imageUrl), false);
+
+const html = `
+<article>
+<ul class="wp-block-list">
+<li>1TB iPhone 17 Pro Cosmic Orange <a href="https://amzn.to/4gzXuys"><strong>$1,214</strong> (Reg. $1,499 new)</a></li>
+<li>512GB iPhone 17 Pro Silver <a href="https://www.amazon.com/dp/B0G458PMRL?tag=toysj-20"><strong>$1,171</strong> (Reg. $1,299 new)</a></li>
+</ul>
+<div class="author-gear"><a href="https://amzn.to/3E1qSMS">AirPods leftover</a></div>
+</article>
+`;
+const found = extractRetailerCandidates(html, "https://9to5toys.com/2026/09/01/iphone-17-pro-deals/");
+assert.equal(found.length, 2);
+assert.equal(found[0].currentPrice, 1214);
+assert.equal(found[0].listPrice, 1499);
+assert.equal(found[1].href.includes("B0G458PMRL"), true);
+assert.equal(found.some((item) => item.href.includes("3E1qSMS")), false);
+assert.equal(/deal score|frontpage deal|slickdeals/i.test(found[0].title), false);
+
+assert.equal(isDirectRetailerListing("https://9to5toys.com/2026/09/01/iphone-17-pro-deals/", "other"), false);
+assert.equal(isDirectRetailerListing("https://www.amazon.com/dp/B08PQ2KWHS", "amazon"), true);
+assert.equal(isCouponOnlyDeal({ promoCode: "PIZZA20", sourceUrl: "", merchant: "other" }), true);
+assert.equal(
+  isCouponOnlyDeal({
+    promoCode: "SAVE10",
+    sourceUrl: "https://www.amazon.com/dp/B08PQ2KWHS",
+    merchant: "amazon",
+  }),
+  false,
+);
+
+delete process.env.SOCIAL_AUTO_POST;
+assert.equal(socialAutoPostEnabled(), false);
+process.env.SOCIAL_AUTO_POST = "true";
+assert.equal(socialAutoPostEnabled(), true);
+process.env.SOCIAL_AUTO_POST = "false";
+assert.equal(socialAutoPostEnabled(), false);
 
 console.log("parser verification passed");

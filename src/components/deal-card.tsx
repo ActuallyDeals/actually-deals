@@ -5,7 +5,7 @@ import { DealImage } from "@/components/deal-image";
 import { formatRelativeTime, formatUsd } from "@/lib/format";
 import { merchantLabel } from "@/lib/merchants";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "@/lib/disclosures";
-import { dealHasProductLink } from "@/lib/outbound";
+import { dealHasProductLink, isCouponOnlyDeal } from "@/lib/outbound";
 import { publicPriceDisplay } from "@/lib/pricing";
 import { isDeadListing, type Deal } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ export function DealCard({
   const dead = isDeadListing(deal);
   const detailHref = `/deal/${deal.slug}`;
   const productLink = dealHasProductLink(deal);
+  const couponOnly = isCouponOnlyDeal(deal);
 
   return (
     <article
@@ -101,7 +102,7 @@ export function DealCard({
                 Get Deal
                 <ExternalLink className="size-4" />
               </a>
-            ) : (
+            ) : couponOnly ? null : (
               <span
                 className={cn(
                   "inline-flex h-12 flex-1 items-center justify-center rounded-xl bg-slate-200 px-4 text-sm font-bold text-slate-500",
@@ -112,15 +113,17 @@ export function DealCard({
               </span>
             )}
           </div>
-          <p className="pointer-events-none mt-3 text-[11px] text-slate-400">
-            {GENERIC_AFFILIATE_DISCLOSURE}
-            {deal.merchant === "amazon" ? (
-              <>
-                <br />
-                {AMAZON_ASSOCIATE_DISCLOSURE}
-              </>
-            ) : null}
-          </p>
+          {couponOnly ? null : (
+            <p className="pointer-events-none mt-3 text-[11px] text-slate-400">
+              {GENERIC_AFFILIATE_DISCLOSURE}
+              {deal.merchant === "amazon" ? (
+                <>
+                  <br />
+                  {AMAZON_ASSOCIATE_DISCLOSURE}
+                </>
+              ) : null}
+            </p>
+          )}
         </div>
       </div>
     </article>

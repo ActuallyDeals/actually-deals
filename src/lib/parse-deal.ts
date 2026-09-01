@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { attachAffiliate, cleanTrackingParams, withHttps } from "@/lib/affiliate";
+import { isRetailerShortUrl } from "@/lib/outbound";
 import { buildDanBullets, buildStackingSteps, discountPercent } from "@/lib/copy-engine";
 import { parseMoney } from "@/lib/format";
 import { preferProductPhoto, resolveDealImage } from "@/lib/images";
@@ -264,7 +265,31 @@ async function fetchMicrolink(url: string): Promise<{ title: string; image: stri
   }
 }
 
-async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string } | null> {
+/** Follow retailer short links (amzn.to, a.co, …) to a product URL. Does not invent an ASIN. */
+export async function unwrapRetailerUrl(rawUrl: string): Promise<string> {
+  let current = rawUrl;
+  for (let step = 0; step < 6; step += 1) {
+    const merchant = detectMerchant(current);
+    if (merchant !== "other" && extractMerchantProductId(current, merchant)) return current;
+    if (!isRetailerShortUrl(current) && step > 0) return current;
+    try {
+      const response = await fetch(current, {
+        method: "GET",
+        redirect: "manual",
+        headers: BROWSER_HEADERS,
+        signal: AbortSignal.timeout(5000),
+      });
+      const location = response.headers.get("location");
+      if (!location) return response.url && response.url !== current ? response.url : current;
+      current = new URL(location, current).toString();
+    } catch {
+      return current;
+    }
+  }
+  return current;
+}
+
+export async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string } | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -361,7 +386,7 @@ function fallbackTitle(merchant: Merchant, productId: string | null, url: string
   return "Untitled deal";
 }
 
-function canonicalSourceUrl(merchant: Merchant, productId: string | null, cleanedUrl: string): string {
+export function canonicalSourceUrl(merchant: Merchant, productId: string | null, cleanedUrl: string): string {
   if (merchant === "amazon" && productId) return `https://www.amazon.com/dp/${productId}`;
   if (merchant === "walmart" && productId) return `https://www.walmart.com/ip/${productId}`;
   if (merchant === "target" && productId) return `https://www.target.com/p/-/A-${productId}`;
@@ -381,7 +406,10 @@ function canonicalSourceUrl(merchant: Merchant, productId: string | null, cleane
 }
 
 export async function parseDealUrl(rawUrl: string): Promise<ParsedDeal> {
-  const started = normalizeUrl(rawUrl);
+  let started = normalizeUrl(rawUrl);
+  if (isRetailerShortUrl(started)) {
+    started = await unwrapRetailerUrl(started);
+  }
   const startedMerchant = detectMerchant(started);
   const startedProductId = extractMerchantProductId(started, startedMerchant);
   const fetched = await fetchHtml(started);
@@ -443,7 +471,7 @@ export async function parseDealUrl(rawUrl: string): Promise<ParsedDeal> {
     title,
     currentPrice,
     listPrice,
-    scrapedImageUrl: extracted.scrapedImageUrl,
+    scrapedImageUrl: extracted.scrapedImageUrl ?? (image.imageTier === "cdn" ? image.imageUrl : null),
     imageUrl: image.imageUrl,
     imageTier: image.imageTier,
     bullets,
@@ -459,9 +487,7 @@ export async function parseDealUrl(rawUrl: string): Promise<ParsedDeal> {
         : null,
       image.imageTier === "placeholder"
         ? "Paste the product Image URL from the listing. Do not generate a lifestyle shot."
-        : image.imageTier === "cdn"
-          ? "Using the Amazon CDN plate. Swap Image URL if you have a cleaner shot."
-          : null,
+        : null,
     ]
       .filter(Boolean)
       .join(" ") || null,

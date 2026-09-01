@@ -7,6 +7,7 @@ import { isBrandedPlaceholder, isUsableImageUrl, resolveDealImage } from "@/lib/
 import { upgradeAmazonImageUrl } from "@/lib/merchants";
 import { SEED_COMMENTS, SEED_DEALS, SEED_VOTES } from "@/lib/seed";
 import { createId, uniqueSlug } from "@/lib/slug";
+import { isCouponOnlyDeal } from "@/lib/outbound";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import type {
   Deal,
@@ -296,8 +297,13 @@ function dealToRow(deal: Deal) {
 function toDealFromInput(input: PublishDealInput, existingSlugs: Set<string>, previous?: Deal): Deal {
   const now = new Date().toISOString();
   const merchant = input.merchant;
-  const sourceUrl = cleanTrackingParams(input.sourceUrl);
-  const affiliateUrl = attachAffiliate(sourceUrl, merchant);
+  const couponOnly = isCouponOnlyDeal({
+    promoCode: input.promoCode,
+    sourceUrl: input.sourceUrl,
+    merchant,
+  });
+  const sourceUrl = couponOnly ? (input.sourceUrl?.trim() ? cleanTrackingParams(input.sourceUrl) : "") : cleanTrackingParams(input.sourceUrl);
+  const affiliateUrl = couponOnly ? "" : attachAffiliate(sourceUrl, merchant);
   const override = staffPhotoUrl(input.imageUrl);
   const scraped = override ?? input.scrapedImageUrl ?? previous?.scrapedImageUrl ?? null;
   const image = resolveDealImage({
@@ -391,7 +397,7 @@ export async function listPublishedDeals(): Promise<Deal[]> {
 
 export function isPublicDeal(deal: Deal): boolean {
   if (SEED_DEALS.some((seed) => seed.id === deal.id || seed.slug === deal.slug)) return false;
-  if (isBrandedPlaceholder(deal.imageUrl)) return false;
+  if (isBrandedPlaceholder(deal.imageUrl) && !isCouponOnlyDeal(deal)) return false;
   return true;
 }
 
@@ -436,9 +442,20 @@ export async function getDealBySlug(slug: string): Promise<Deal | null> {
   return state.deals.find((deal) => deal.slug === slug) ?? null;
 }
 
-function validateDealInput(input: PublishDealInput): void {
-  if (!input.title?.trim() || !input.sourceUrl?.trim()) {
+export function validateDealInput(input: PublishDealInput): void {
+  if (!input.title?.trim()) {
+    throw new Error("Title is required.");
+  }
+  const couponOnly = isCouponOnlyDeal({
+    promoCode: input.promoCode,
+    sourceUrl: input.sourceUrl,
+    merchant: input.merchant,
+  });
+  if (!couponOnly && !input.sourceUrl?.trim()) {
     throw new Error("Title and source URL are required.");
+  }
+  if (couponOnly && !input.promoCode?.trim()) {
+    throw new Error("Coupon posts need a code.");
   }
   if (input.queueStage === "ready") {
     const boxes = staffWriteupBoxes({
@@ -453,6 +470,12 @@ function validateDealInput(input: PublishDealInput): void {
   if (!publishing) return;
   if (input.bullets.filter((bullet) => bullet.trim()).length !== 3) {
     throw new Error("Every published deal needs exactly three summary bullets.");
+  }
+  if (couponOnly) {
+    if (input.currentPrice != null && (!Number.isFinite(input.currentPrice) || input.currentPrice < 0)) {
+      throw new Error("Current price cannot be negative.");
+    }
+    return;
   }
   if (input.currentPrice == null || !Number.isFinite(input.currentPrice) || input.currentPrice < 0) {
     throw new Error("Current price is required to publish. Do not invent one.");

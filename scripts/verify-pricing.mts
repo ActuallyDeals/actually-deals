@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { originalWhyNote } from "../src/lib/editorial.ts";
+import { isCouponOnlyDeal } from "../src/lib/outbound.ts";
+import { validateDealInput } from "../src/lib/store.ts";
 import { publicPriceDisplay } from "../src/lib/pricing.ts";
 import { rewritePastedDeal, stackedBullets } from "../src/lib/stack-copy.ts";
 
@@ -78,5 +80,34 @@ assert.equal(oneLine.clipCoupon, true);
 assert.equal(oneLine.subscribeSave, true);
 assert.equal(oneLine.currentPrice, "2.24");
 assert.equal(oneLine.listPrice, "2.99");
+
+
+validateDealInput({
+  title: "Domino's 50% off",
+  merchant: "other",
+  sourceUrl: "",
+  currentPrice: 0,
+  listPrice: null,
+  promoCode: "PIZZA50",
+  bullets: ["Use the code at checkout.", "No retailer link on this post.", "Confirm the app total before you pay."],
+  status: "published",
+});
+
+let threw = false;
+try {
+  validateDealInput({
+    title: "Instant Pot",
+    merchant: "amazon",
+    sourceUrl: "https://www.amazon.com/dp/B08PQ2KWHS",
+    currentPrice: 49,
+    listPrice: null,
+    bullets: ["a", "b", "c"],
+    status: "published",
+  });
+} catch {
+  threw = true;
+}
+assert.equal(threw, true);
+assert.equal(isCouponOnlyDeal({ promoCode: "PIZZA50", sourceUrl: "", merchant: "other" }), true);
 
 console.log("pricing verification passed");

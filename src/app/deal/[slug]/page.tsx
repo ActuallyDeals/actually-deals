@@ -9,7 +9,7 @@ import { SiteHeader } from "@/components/site-header";
 import { VoteWidget } from "@/components/vote-widget";
 import { formatRelativeTime, formatUsd } from "@/lib/format";
 import { merchantLabel } from "@/lib/merchants";
-import { dealHasProductLink } from "@/lib/outbound";
+import { dealHasProductLink, isCouponOnlyDeal } from "@/lib/outbound";
 import { originalWhyNote } from "@/lib/editorial";
 import { publicPriceDisplay } from "@/lib/pricing";
 import { getDealBySlug, getMyVote, listComments } from "@/lib/store";
@@ -47,6 +47,7 @@ export default async function DealPage({
   const expired = isCommunityExpired(deal);
   const price = publicPriceDisplay(deal);
   const productLink = dealHasProductLink(deal);
+  const couponOnly = isCouponOnlyDeal(deal);
 
   return (
     <div className="flex min-h-full flex-col bg-slate-100">
@@ -106,21 +107,23 @@ export default async function DealPage({
                     >
                       Get Deal at {merchantLabel(deal.merchant)}
                     </a>
-                  ) : (
+                  ) : couponOnly ? null : (
                     <span className="inline-flex h-12 flex-1 items-center justify-center rounded-xl bg-slate-200 text-sm font-bold text-slate-500">
                       No product link
                     </span>
                   )}
                 </div>
-                <p className="mt-3 text-[11px] text-slate-400">
-                  {GENERIC_AFFILIATE_DISCLOSURE}
-                  {deal.merchant === "amazon" ? (
-                    <>
-                      <br />
-                      {AMAZON_ASSOCIATE_DISCLOSURE}
-                    </>
-                  ) : null}
-                </p>
+                {couponOnly ? null : (
+                  <p className="mt-3 text-[11px] text-slate-400">
+                    {GENERIC_AFFILIATE_DISCLOSURE}
+                    {deal.merchant === "amazon" ? (
+                      <>
+                        <br />
+                        {AMAZON_ASSOCIATE_DISCLOSURE}
+                      </>
+                    ) : null}
+                  </p>
+                )}
               </div>
             </div>
 
