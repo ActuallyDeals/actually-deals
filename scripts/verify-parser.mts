@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { attachAffiliate, cleanTrackingParams, withHttps } from "../src/lib/affiliate.ts";
 import { imageFallbackChain, isBrandedPlaceholder, resolveDealImage } from "../src/lib/images.ts";
 import { findDuplicateDeal } from "../src/lib/desk.ts";
-import { extractRetailerCandidates } from "../src/lib/ingest-roundup.ts";
+import { dealsFromRoundupCandidates, extractRetailerCandidates, pickRetailerHref } from "../src/lib/ingest-roundup.ts";
 import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
 import { canonicalSourceUrl, titleFromProductUrl } from "../src/lib/parse-deal.ts";
 import { giftCardFaceValue } from "../src/lib/pricing.ts";
@@ -76,22 +76,77 @@ const amazonCdn = resolveDealImage({
 assert.equal(amazonCdn.imageTier, "cdn");
 assert.equal(isBrandedPlaceholder(amazonCdn.imageUrl), false);
 
+const pageUrl = "https://9to5toys.com/2026/09/01/iphone-17-pro-deals/";
+assert.equal(
+  pickRetailerHref(
+    "https://9to5toys.com/goto?url=https%3A%2F%2Fwww.amazon.com%2Fdp%2FB0G467WG1C%3Ftag%3Dtoysj-20",
+    pageUrl,
+  )?.includes("B0G467WG1C"),
+  true,
+);
+assert.equal(
+  pickRetailerHref("/out?u=https://www.amazon.com/dp/B0G45F93BH", pageUrl)?.includes("B0G45F93BH"),
+  true,
+);
+assert.equal(
+  pickRetailerHref("https://9to5toys.com/recomm?dest=https://www.amazon.com/gp/product/B0G458PMRL", pageUrl)?.includes(
+    "B0G458PMRL",
+  ),
+  true,
+);
+
 const html = `
-<article>
+<div class="post-content">
+<h1>iPhone 17 Pro models drop to new Amazon all-time lows again at up to $285 off (Renewed Premium)</h1>
 <ul class="wp-block-list">
-<li>1TB iPhone 17 Pro Cosmic Orange <a href="https://amzn.to/4gzXuys"><strong>$1,214</strong> (Reg. $1,499 new)</a></li>
-<li>512GB iPhone 17 Pro Silver <a href="https://www.amazon.com/dp/B0G458PMRL?tag=toysj-20"><strong>$1,171</strong> (Reg. $1,299 new)</a></li>
+<li>1TB iPhone 17 Pro Cosmic Orange <a href="https://amzn.to/4gzXuys"><strong>$1,214</strong> (Reg. $1,499 new)</a> – New all-time low</li>
+<li>512GB iPhone 17 Pro Silver <a href="https://www.amazon.com/dp/B0G467WG1C?tag=toysj-20"><strong>$1,171</strong> (Reg. $1,299 new)</a></li>
+<li>512GB iPhone 17 Pro Silver <a href="https://9to5toys.com/goto?url=https%3A%2F%2Fwww.amazon.com%2Fgp%2Fproduct%2FB0G467WG1C%3Ftag%3Dtoysj-20"><strong>$1,171</strong> (Reg. $1,299 new)</a></li>
 </ul>
+<div class="wp-block-media-text"><p><a href="https://www.amazon.com/dp/B0GJTXVN9Z?tag=toysj-20">New 2026 AirTag 2 now down as low as $20 each</a></p></div>
+<div class="related-guides"><ul><li><a href="https://www.amazon.com/dp/B0D1XD1ZV3">AirPods leftover</a></li></ul></div>
 <div class="author-gear"><a href="https://amzn.to/3E1qSMS">AirPods leftover</a></div>
-</article>
+</div>
 `;
-const found = extractRetailerCandidates(html, "https://9to5toys.com/2026/09/01/iphone-17-pro-deals/");
+const found = extractRetailerCandidates(html, pageUrl);
 assert.equal(found.length, 2);
 assert.equal(found[0].currentPrice, 1214);
 assert.equal(found[0].listPrice, 1499);
-assert.equal(found[1].href.includes("B0G458PMRL"), true);
+assert.equal(found[1].currentPrice, 1171);
+assert.equal(found[1].listPrice, 1299);
+assert.equal(found[0].href.includes("amzn.to/4gzXuys"), true);
+assert.equal(found[1].href.includes("B0G467WG1C"), true);
+assert.equal(found[1].href.includes("9to5toys.com/goto"), false);
+assert.equal(found.some((item) => item.href.includes("B0GJTXVN9Z")), false);
+assert.equal(found.some((item) => item.href.includes("B0D1XD1ZV3")), false);
 assert.equal(found.some((item) => item.href.includes("3E1qSMS")), false);
-assert.equal(/deal score|frontpage deal|slickdeals/i.test(found[0].title), false);
+assert.equal(/all-time low|models drop|renewed premium/i.test(found[0].title), false);
+assert.equal(found[0].title.includes("1TB iPhone 17 Pro Cosmic Orange"), true);
+assert.equal(found[1].title.includes("512GB iPhone 17 Pro Silver"), true);
+
+const asins = new Set(
+  found
+    .map((item) => extractMerchantProductId(item.href, detectMerchant(item.href)))
+    .filter((value): value is string => Boolean(value)),
+);
+assert.equal(asins.size, 1);
+assert.equal(asins.has("B0G467WG1C"), true);
+
+const roundupDeals = dealsFromRoundupCandidates(found);
+assert.equal(roundupDeals.length, 2);
+for (const deal of roundupDeals) {
+  assert.equal(/toysj-20|9to5-20|tag=9to5/i.test(deal.affiliateUrl), false);
+  assert.equal(deal.socialPost, "");
+}
+const silver = roundupDeals.find((deal) => deal.merchantProductId === "B0G467WG1C");
+assert.equal(silver?.merchant, "amazon");
+assert.equal(silver?.affiliateUrl.includes("tag=actuallydea07-20"), true);
+assert.equal(silver?.sourceUrl, "https://www.amazon.com/dp/B0G467WG1C");
+assert.equal(silver?.listPrice, 1299);
+assert.equal(silver?.imageTier, "cdn");
+assert.equal(silver?.imageUrl.includes("B0G467WG1C"), true);
+assert.equal(silver?.bullets.length, 3);
+assert.equal(/uber|doordash|grubhub|app code/i.test(silver?.bullets.join(" ") ?? ""), false);
 
 assert.equal(isDirectRetailerListing("https://9to5toys.com/2026/09/01/iphone-17-pro-deals/", "other"), false);
 assert.equal(isDirectRetailerListing("https://www.amazon.com/dp/B08PQ2KWHS", "amazon"), true);

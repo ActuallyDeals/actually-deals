@@ -17,7 +17,13 @@ import type { Merchant, ParsedDeal } from "@/lib/types";
 
 const UNWRAP_TIMEOUT_MS = 5000;
 const ROUNDUP_CAP = 12;
-const SKIP_CLOSEST = "nav, footer, header, aside, .author-gear, .author-gear-items, .author-box, .related, .recommended, #comments, .comments";
+/** Classes/ids proven on 9to5Toys recirc: sidebar cards, related guides, newsletter, author gear, in-post media-text promos. */
+const SKIP_CLOSEST =
+  "nav, footer, header, aside, .sidebar, .author-gear, .author-gear-items, .author-box, .author-bio, .author-bio-container, .related, .related-guides, .related-guide, .recommended, .visitor-promo, .featured-items, .ninetofive-newsletter-subscribe, .wp-block-media-text, #comments, .comments";
+
+const NESTED_KEYS = ["u", "url", "destination", "dest", "murl", "target", "redirect", "rurl", "link"];
+const WRAPPER_PATH = /(?:^|\/)(?:goto|out|recomm|aff)(?:\/|$)/i;
+const WRAPPER_HOSTS = ["geni.us", "geniuslink.com"];
 
 export interface RoundupCandidate {
   href: string;
@@ -31,25 +37,73 @@ export interface IngestResult {
   scrapeNote: string | null;
 }
 
+function absoluteUrl(raw: string, pageUrl?: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    return pageUrl ? new URL(trimmed, pageUrl).toString() : new URL(trimmed).toString();
+  } catch {
+    return null;
+  }
+}
+
+function decodeMaybeUrl(value: string): string | null {
+  const tries = [value];
+  try {
+    const decoded = decodeURIComponent(value);
+    if (decoded !== value) tries.push(decoded);
+  } catch {
+    // ignore
+  }
+  for (const candidate of tries) {
+    const trimmed = candidate.trim();
+    if (!/^https?:\/\//i.test(trimmed)) continue;
+    try {
+      return new URL(trimmed).toString();
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
 function nestedRetailerUrls(href: string): string[] {
   const found: string[] = [];
   try {
     const url = new URL(href);
     found.push(url.toString());
-    for (const key of ["u", "url", "destination", "dest", "murl"]) {
+    for (const key of NESTED_KEYS) {
       const nested = url.searchParams.get(key);
-      if (nested) {
-        try {
-          found.push(new URL(nested).toString());
-        } catch {
-          // ignore
-        }
+      if (!nested) continue;
+      const decoded = decodeMaybeUrl(nested);
+      if (decoded) found.push(decoded);
+    }
+    const pathEmbedded = url.pathname.match(/\/(?:goto|out|recomm|aff)\/(.+)/i);
+    if (pathEmbedded?.[1]) {
+      let rest = pathEmbedded[1];
+      try {
+        rest = decodeURIComponent(rest);
+      } catch {
+        // ignore
       }
+      const decoded = decodeMaybeUrl(rest.startsWith("http") ? rest : `https://${rest}`);
+      if (decoded) found.push(decoded);
     }
   } catch {
     // ignore
   }
   return found;
+}
+
+function isClickWrapper(href: string): boolean {
+  try {
+    const url = new URL(href);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (WRAPPER_HOSTS.some((part) => host === part || host.endsWith(`.${part}`))) return true;
+    return WRAPPER_PATH.test(url.pathname);
+  } catch {
+    return false;
+  }
 }
 
 function isRetailerish(href: string): boolean {
@@ -58,21 +112,41 @@ function isRetailerish(href: string): boolean {
   return isRetailerShortUrl(href);
 }
 
-function pickRetailerHref(raw: string, pageUrl: string): string | null {
-  let absolute = raw.trim();
-  if (!absolute) return null;
-  try {
-    absolute = new URL(absolute, pageUrl).toString();
-  } catch {
-    return null;
-  }
-  for (const candidate of nestedRetailerUrls(absolute)) {
-    if (!isRetailerish(candidate)) continue;
-    const merchant = detectMerchant(candidate);
-    if (isRetailerShortUrl(candidate)) return candidate;
-    if (merchant !== "other" && extractMerchantProductId(candidate, merchant)) return candidate;
-  }
+function retailerProductHref(href: string): string | null {
+  if (!isRetailerish(href)) return null;
+  const merchant = detectMerchant(href);
+  if (isRetailerShortUrl(href)) return href;
+  if (merchant !== "other" && extractMerchantProductId(href, merchant)) return href;
   return null;
+}
+
+/** Resolve a pasted/roundup href to a retailer short link, product URL, or click wrapper to follow. */
+export function pickRetailerHref(raw: string, pageUrl: string): string | null {
+  const absolute = absoluteUrl(raw, pageUrl);
+  if (!absolute) return null;
+  for (const candidate of nestedRetailerUrls(absolute)) {
+    const hit = retailerProductHref(candidate);
+    if (hit) return hit;
+  }
+  if (isClickWrapper(absolute)) return absolute;
+  return null;
+}
+
+function listingKey(href: string, merchant?: Merchant, productId?: string | null): string {
+  const resolvedMerchant = merchant ?? detectMerchant(href);
+  const resolvedId =
+    productId !== undefined
+      ? productId
+      : resolvedMerchant !== "other"
+        ? extractMerchantProductId(href, resolvedMerchant)
+        : null;
+  if (resolvedMerchant !== "other" && resolvedId) return `${resolvedMerchant}:${resolvedId}`;
+  try {
+    const url = new URL(href);
+    return `${url.hostname.replace(/^www\./, "")}${url.pathname}`.toLowerCase();
+  } catch {
+    return href.split("?")[0].toLowerCase();
+  }
 }
 
 function pricesFromText(text: string): { current: number | null; list: number | null } {
@@ -94,7 +168,9 @@ function titleFromItemText(text: string): string {
     .replace(/\$[0-9][0-9,]*(?:\.[0-9]{1,2})?/g, " ")
     .replace(/\(reg\.?[^)]*\)/gi, " ")
     .replace(/\bwas\b[^.]{0,24}/gi, " ")
-    .replace(/[–—-]\s*(new )?all-time low.*$/gi, " ")
+    .replace(/[–—-]\s*(new )?all-time lows?.*$/gi, " ")
+    .replace(/\b(new )?all-time lows?\b/gi, " ")
+    .replace(/\b9to5(?:toys|mac|google)?\b/gi, " ")
     .replace(/\b(deal score|frontpage deal|slickdeals)\b.*$/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -102,12 +178,23 @@ function titleFromItemText(text: string): string {
 }
 
 function contentRoot($: cheerio.CheerioAPI) {
-  const article = $("article, .entry-content, .post-content, .post-body, main").first();
-  return article.length ? article : $("body");
+  for (const sel of [".post-content", ".entry-content", ".post-body", "article", "main"]) {
+    const node = $(sel).first();
+    if (node.length) return node;
+  }
+  return $("body");
 }
 
 function skipped($: cheerio.CheerioAPI, el: AnyNode): boolean {
   return $(el).closest(SKIP_CLOSEST).length > 0;
+}
+
+function itemBlob($: cheerio.CheerioAPI, anchor: AnyNode): string {
+  const li = $(anchor).closest("li");
+  if (li.length) return li.text().replace(/\s+/g, " ").trim();
+  const p = $(anchor).closest("p");
+  if (p.length) return p.text().replace(/\s+/g, " ").trim();
+  return ($(anchor).text() || "").replace(/\s+/g, " ").trim();
 }
 
 function candidateFromAnchor(
@@ -117,8 +204,7 @@ function candidateFromAnchor(
 ): RoundupCandidate | null {
   const href = pickRetailerHref($(anchor).attr("href") ?? "", pageUrl);
   if (!href) return null;
-  const item = $(anchor).closest("li, p, div");
-  const blob = (item.text() || $(anchor).text() || "").replace(/\s+/g, " ").trim();
+  const blob = itemBlob($, anchor);
   const priced = pricesFromText(blob);
   const title = titleFromItemText(blob) || titleFromItemText($(anchor).text()) || "Untitled deal";
   return {
@@ -127,6 +213,13 @@ function candidateFromAnchor(
     currentPrice: priced.current,
     listPrice: priced.list,
   };
+}
+
+function pushUnique(list: RoundupCandidate[], seen: Set<string>, candidate: RoundupCandidate) {
+  const key = listingKey(candidate.href);
+  if (seen.has(key)) return;
+  seen.add(key);
+  list.push(candidate);
 }
 
 /** Sync extract of retailer product links + on-page prices. Does not invent prices. */
@@ -138,14 +231,14 @@ export function extractRetailerCandidates(html: string, pageUrl: string): Roundu
 
   root.find("li").each((_, li) => {
     if (skipped($, li)) return;
-    const anchor = $(li).find("a[href]").toArray().find((el) => pickRetailerHref($(el).attr("href") ?? "", pageUrl));
+    const anchor = $(li)
+      .find("a[href]")
+      .toArray()
+      .find((el) => pickRetailerHref($(el).attr("href") ?? "", pageUrl));
     if (!anchor) return;
     const candidate = candidateFromAnchor($, anchor, pageUrl);
     if (!candidate) return;
-    const key = candidate.href.split("?")[0];
-    if (seen.has(key)) return;
-    seen.add(key);
-    listHits.push(candidate);
+    pushUnique(listHits, seen, candidate);
   });
 
   if (listHits.length >= 2) return listHits.slice(0, ROUNDUP_CAP);
@@ -156,17 +249,24 @@ export function extractRetailerCandidates(html: string, pageUrl: string): Roundu
     if (skipped($, el)) return;
     const candidate = candidateFromAnchor($, el, pageUrl);
     if (!candidate) return;
-    const key = candidate.href.split("?")[0];
-    if (seenAll.has(key)) return;
-    seenAll.add(key);
-    all.push(candidate);
+    pushUnique(all, seenAll, candidate);
   });
   return all.slice(0, ROUNDUP_CAP);
+}
+
+function firstProductUrl(href: string): string | null {
+  for (const candidate of nestedRetailerUrls(href)) {
+    const merchant = detectMerchant(candidate);
+    if (merchant !== "other" && extractMerchantProductId(candidate, merchant)) return candidate;
+  }
+  return null;
 }
 
 async function unwrapRedirects(rawUrl: string): Promise<string> {
   let current = rawUrl;
   for (let step = 0; step < 6; step += 1) {
+    const nestedProduct = firstProductUrl(current);
+    if (nestedProduct) return nestedProduct;
     const merchant = detectMerchant(current);
     if (merchant !== "other" && extractMerchantProductId(current, merchant)) return current;
     try {
@@ -197,8 +297,10 @@ function parsedFromCandidate(
   unwrapped: string,
   unwrapFailed: boolean,
 ): ParsedDeal {
-  const merchant: Merchant = detectMerchant(unwrapped) === "other" ? detectMerchant(candidate.href) : detectMerchant(unwrapped);
-  const productId = extractMerchantProductId(unwrapped, merchant) ?? extractMerchantProductId(candidate.href, merchant);
+  const merchant: Merchant =
+    detectMerchant(unwrapped) === "other" ? detectMerchant(candidate.href) : detectMerchant(unwrapped);
+  const productId =
+    extractMerchantProductId(unwrapped, merchant) ?? extractMerchantProductId(candidate.href, merchant);
   const cleaned = cleanTrackingParams(unwrapped);
   const sourceUrl = canonicalSourceUrl(merchant, productId, cleaned);
   const affiliateUrl = attachAffiliate(sourceUrl, merchant);
@@ -224,9 +326,7 @@ function parsedFromCandidate(
     promoCode: null,
   });
   const notes = [
-    unwrapFailed
-      ? "Short link did not unwrap. Confirm the retailer URL before Ready."
-      : null,
+    unwrapFailed ? "Short link did not unwrap. Confirm the retailer URL before Ready." : null,
     currentPrice == null ? "Paste the live price from the listing. Do not invent one." : null,
     image.imageTier === "placeholder" && !cdnImageFor(merchant, productId)
       ? "Paste the product Image URL from the listing. Do not generate a lifestyle shot."
@@ -253,6 +353,30 @@ function parsedFromCandidate(
   };
 }
 
+/** Turn extracted roundup rows into Incoming cards without fetching. Does not clone source writeup. */
+export function dealsFromRoundupCandidates(
+  candidates: RoundupCandidate[],
+  unwrappedByHref?: Map<string, string>,
+): ParsedDeal[] {
+  const deals: ParsedDeal[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const unwrapped = unwrappedByHref?.get(candidate.href) ?? candidate.href;
+    const deal = parsedFromCandidate(candidate, unwrapped, false);
+    const key = listingKey(deal.sourceUrl, deal.merchant, deal.merchantProductId);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deals.push(deal);
+  }
+  return deals;
+}
+
+function hrefNeedsUnwrap(href: string): boolean {
+  if (isClickWrapper(href) || isRetailerShortUrl(href)) return true;
+  const merchant = detectMerchant(href);
+  return merchant === "other" || !extractMerchantProductId(href, merchant);
+}
+
 async function ingestThirdPartyPage(rawUrl: string): Promise<IngestResult> {
   const started = withHttps(rawUrl.trim());
   const fetched = await fetchHtml(started);
@@ -273,18 +397,22 @@ async function ingestThirdPartyPage(rawUrl: string): Promise<IngestResult> {
   }
 
   const deals: ParsedDeal[] = [];
+  const seen = new Set<string>();
   for (const candidate of candidates) {
-    const needsUnwrap = isRetailerShortUrl(candidate.href) || !extractMerchantProductId(candidate.href, detectMerchant(candidate.href));
     let unwrapped = candidate.href;
     let unwrapFailed = false;
-    if (needsUnwrap) {
+    if (hrefNeedsUnwrap(candidate.href)) {
       unwrapped = await unwrapRedirects(candidate.href);
       const merchant = detectMerchant(unwrapped);
       if (merchant === "other" || !extractMerchantProductId(unwrapped, merchant)) {
-        unwrapFailed = isRetailerShortUrl(candidate.href);
+        unwrapFailed = isRetailerShortUrl(candidate.href) || isClickWrapper(candidate.href);
       }
     }
-    deals.push(parsedFromCandidate(candidate, unwrapped, unwrapFailed));
+    const deal = parsedFromCandidate(candidate, unwrapped, unwrapFailed);
+    const key = listingKey(deal.sourceUrl, deal.merchant, deal.merchantProductId);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deals.push(deal);
   }
 
   const missing = deals.filter((deal) => deal.currentPrice == null).length;
