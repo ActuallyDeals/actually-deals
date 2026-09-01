@@ -268,7 +268,7 @@ async function ingestThirdPartyPage(rawUrl: string): Promise<IngestResult> {
     return {
       deals: [],
       scrapeNote:
-        "No retailer product links found on that page. Paste an Amazon, Walmart, Target, Home Depot, Best Buy, or Costco product URL.",
+        "No retailer product links found on that page. Paste an Amazon, Walmart, Target, Home Depot, Best Buy, Costco, Newegg, eBay, Kohl's, Dick's, or Office Depot product URL.",
     };
   }
 

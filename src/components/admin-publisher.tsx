@@ -508,7 +508,9 @@ export function AdminPublisher({
       const parsed = deals[0]!;
       parsedUrls.current.add(target);
       parsedUrls.current.add(parsed.sourceUrl);
-      setUrl(parsed.sourceUrl);
+      if (document.activeElement !== urlRef.current) {
+        setUrl(parsed.sourceUrl);
+      }
       applyParsed(parsed);
       const duplicate =
         payload.deskDuplicate && payload.deskDuplicate.slug !== editingSlug
