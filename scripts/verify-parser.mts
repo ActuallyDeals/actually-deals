@@ -8,6 +8,8 @@ import { canonicalSourceUrl, titleFromProductUrl } from "../src/lib/parse-deal.t
 import { giftCardFaceValue } from "../src/lib/pricing.ts";
 import { isCouponOnlyDeal, isDirectRetailerListing, isRetailerShortUrl } from "../src/lib/outbound.ts";
 import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
+import { buildFacebookPost, buildInstagramCaption, buildSocialPost } from "../src/lib/copy-engine.ts";
+import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "../src/lib/disclosures.ts";
 
 assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ2KWHS");
 assert.equal(extractMerchantProductId(withHttps("amazon.com/dp/B08PQ2KWHS"), "amazon"), "B08PQ2KWHS");
@@ -291,5 +293,81 @@ assert.equal(
   isCouponOnlyDeal({ promoCode: "EATS20", sourceUrl: "https://www.ubereats.com/promo", merchant: "uber" }),
   true,
 );
+
+const couponDraftInput = {
+  title: "Uber Eats 20% off first order",
+  merchant: "uber" as const,
+  currentPrice: null,
+  promoCode: "EATS20",
+  slug: "uber-eats-20",
+  why: "Use Get Deal so you land on the cleaned product page.",
+  stack: "Free Prime shipping on eligible orders.",
+};
+const couponX = buildSocialPost(couponDraftInput);
+assert.equal(couponX.includes("Uber Eats 20% off first order at Uber w/ code EATS20"), true);
+assert.equal(couponX.includes("actuallydeals.com/deal/uber-eats-20"), true);
+assert.equal(couponX.includes("#ad"), true);
+assert.equal(couponX.includes("$"), false);
+assert.equal(couponX.includes("Get Deal"), false);
+assert.equal(couponX.includes("Prime"), false);
+assert.equal(couponX.length <= 280, true);
+
+const couponIg = buildInstagramCaption(couponDraftInput);
+assert.equal(couponIg.includes("Uber Eats 20% off first order at Uber w/ code EATS20"), true);
+assert.equal(couponIg.includes(GENERIC_AFFILIATE_DISCLOSURE), true);
+assert.equal(couponIg.includes(AMAZON_ASSOCIATE_DISCLOSURE), false);
+assert.equal(couponIg.includes("@actuallydeals_"), true);
+assert.equal(couponIg.includes("actuallydeals.com/deal/uber-eats-20"), true);
+assert.equal(couponIg.includes("Get Deal"), false);
+assert.equal(couponIg.includes("Prime"), false);
+
+const couponFb = buildFacebookPost(couponDraftInput);
+assert.equal(couponFb.includes("Uber Eats 20% off first order at Uber w/ code EATS20"), true);
+assert.equal(couponFb.includes(GENERIC_AFFILIATE_DISCLOSURE), true);
+assert.equal(couponFb.includes("ActuallyDeals"), true);
+assert.equal(couponFb.includes("Get Deal"), false);
+
+const emptyTitleX = buildSocialPost({
+  title: "   ",
+  merchant: "doordash",
+  currentPrice: null,
+  promoCode: "DASH10",
+});
+assert.equal(emptyTitleX.includes("This deal at DoorDash w/ code DASH10"), true);
+assert.equal(emptyTitleX.includes("#ad"), true);
+assert.equal(emptyTitleX.includes("$"), false);
+
+const uberNoCode = buildSocialPost({
+  title: "Uber Eats weekend promo",
+  merchant: "uber",
+  currentPrice: null,
+  slug: "uber-weekend",
+});
+assert.equal(uberNoCode.includes("Uber Eats weekend promo at Uber"), true);
+assert.equal(uberNoCode.includes("w/ code"), false);
+assert.equal(uberNoCode.includes("$"), false);
+
+assert.equal(
+  buildSocialPost({ title: "Mystery SKU", merchant: "walmart", currentPrice: null }),
+  "",
+);
+
+const pricedX = buildSocialPost({
+  title: "Instant Pot Duo Plus",
+  merchant: "amazon",
+  currentPrice: 49,
+  slug: "instant-pot",
+});
+assert.equal(pricedX.includes("$49 Instant Pot Duo Plus at Amazon"), true);
+assert.equal(pricedX.includes("w/ code"), false);
+
+const amazonCouponIg = buildInstagramCaption({
+  title: "Paper towels",
+  merchant: "amazon",
+  currentPrice: null,
+  promoCode: "SAVE5",
+});
+assert.equal(amazonCouponIg.includes(AMAZON_ASSOCIATE_DISCLOSURE), true);
+assert.equal(amazonCouponIg.includes(GENERIC_AFFILIATE_DISCLOSURE), false);
 
 console.log("parser verification passed");

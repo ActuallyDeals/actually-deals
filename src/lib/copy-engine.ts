@@ -175,6 +175,7 @@ type SocialComposeInput = {
   title: string;
   merchant: Merchant;
   currentPrice: number | null;
+  promoCode?: string | null;
   why?: string | null;
   stack?: string | null;
   verify?: string | null;
@@ -191,12 +192,45 @@ function hasLivePrice(price: number | null): price is number {
   return price != null && Number.isFinite(price) && price >= 0;
 }
 
+function canWriteCouponSocial(input: SocialComposeInput): boolean {
+  if (input.promoCode?.trim()) return true;
+  return isAppCouponDeal({ merchant: input.merchant, promoCode: input.promoCode });
+}
+
+function couponDealName(title: string): string {
+  return title.trim() || "This deal";
+}
+
+function couponHeadline(title: string, merchant: Merchant, promoCode?: string | null): string {
+  const name = couponDealName(title);
+  const store = merchantLabel(merchant);
+  const code = promoCode?.trim();
+  return code ? `${name} at ${store} w/ code ${code}` : `${name} at ${store}`;
+}
+
 function priceHeadline(title: string, merchant: Merchant, currentPrice: number): string {
   return `${formatUsd(currentPrice)} ${shortDealName(title)} at ${merchantLabel(merchant)}`;
 }
 
 function disclosureLine(merchant: Merchant): string {
   return merchant === "amazon" ? AMAZON_ASSOCIATE_DISCLOSURE : GENERIC_AFFILIATE_DISCLOSURE;
+}
+
+function clipTweet(parts: string[]): string {
+  const post = parts.join("\n");
+  return post.length <= 280 ? post : `${post.slice(0, 277)}…`;
+}
+
+function xPostFromHeadline(headline: string, input: SocialComposeInput, withContext: boolean): string {
+  const url = publicDealUrl(input.slug);
+  const parts = [headline];
+  if (withContext) {
+    const context = oneContextLine(input.why, input.stack);
+    if (context) parts.push("", context);
+  }
+  if (url) parts.push("", `${url} #ad`);
+  else parts.push("", "#ad");
+  return clipTweet(parts);
 }
 
 function longerCaptionBody(input: SocialComposeInput & { currentPrice: number }): string[] {
@@ -210,48 +244,68 @@ function longerCaptionBody(input: SocialComposeInput & { currentPrice: number })
   return parts;
 }
 
-/** Original X draft from our fields only. Empty when there is no live price. Does not post. */
-export function buildSocialPost(input: SocialComposeInput): string {
-  if (!hasLivePrice(input.currentPrice)) return "";
-  const headline = priceHeadline(input.title, input.merchant, input.currentPrice);
-  const context = oneContextLine(input.why, input.stack);
+function couponCaptionParts(input: SocialComposeInput, handle: string): string {
   const url = publicDealUrl(input.slug);
-  const parts = [headline];
-  if (context) parts.push("", context);
-  if (url) parts.push("", `${url} #ad`);
-  else parts.push("", "#ad");
-  const post = parts.join("\n");
-  return post.length <= 280 ? post : `${post.slice(0, 277)}…`;
+  const parts = [
+    couponHeadline(input.title, input.merchant, input.promoCode),
+    "",
+    disclosureLine(input.merchant),
+    "",
+    handle,
+  ];
+  if (url) parts.push("", url);
+  return parts.join("\n");
+}
+
+/** Original X draft from our fields only. Empty when there is no live price and no coupon/app deal. Does not post. */
+export function buildSocialPost(input: SocialComposeInput): string {
+  if (hasLivePrice(input.currentPrice)) {
+    return xPostFromHeadline(priceHeadline(input.title, input.merchant, input.currentPrice), input, true);
+  }
+  if (canWriteCouponSocial(input)) {
+    return xPostFromHeadline(couponHeadline(input.title, input.merchant, input.promoCode), input, false);
+  }
+  return "";
 }
 
 /** Slightly longer Instagram caption from our fields only. Does not post. */
 export function buildInstagramCaption(input: SocialComposeInput): string {
-  if (!hasLivePrice(input.currentPrice)) return "";
-  const url = publicDealUrl(input.slug);
-  const parts = [
-    ...longerCaptionBody({ ...input, currentPrice: input.currentPrice }),
-    "",
-    disclosureLine(input.merchant),
-    "",
-    `@${SOCIAL.instagram.handle}`,
-  ];
-  if (url) parts.push("", url);
-  return parts.join("\n");
+  if (hasLivePrice(input.currentPrice)) {
+    const url = publicDealUrl(input.slug);
+    const parts = [
+      ...longerCaptionBody({ ...input, currentPrice: input.currentPrice }),
+      "",
+      disclosureLine(input.merchant),
+      "",
+      `@${SOCIAL.instagram.handle}`,
+    ];
+    if (url) parts.push("", url);
+    return parts.join("\n");
+  }
+  if (canWriteCouponSocial(input)) {
+    return couponCaptionParts(input, `@${SOCIAL.instagram.handle}`);
+  }
+  return "";
 }
 
 /** Facebook draft from our fields only. Page name ActuallyDeals. Does not post. */
 export function buildFacebookPost(input: SocialComposeInput): string {
-  if (!hasLivePrice(input.currentPrice)) return "";
-  const url = publicDealUrl(input.slug);
-  const parts = [
-    ...longerCaptionBody({ ...input, currentPrice: input.currentPrice }),
-    "",
-    disclosureLine(input.merchant),
-    "",
-    SOCIAL.facebook.handle,
-  ];
-  if (url) parts.push("", url);
-  return parts.join("\n");
+  if (hasLivePrice(input.currentPrice)) {
+    const url = publicDealUrl(input.slug);
+    const parts = [
+      ...longerCaptionBody({ ...input, currentPrice: input.currentPrice }),
+      "",
+      disclosureLine(input.merchant),
+      "",
+      SOCIAL.facebook.handle,
+    ];
+    if (url) parts.push("", url);
+    return parts.join("\n");
+  }
+  if (canWriteCouponSocial(input)) {
+    return couponCaptionParts(input, SOCIAL.facebook.handle);
+  }
+  return "";
 }
 
 export function composeSocialDrafts(input: SocialComposeInput): SocialDrafts {
