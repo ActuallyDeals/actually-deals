@@ -22,9 +22,16 @@ export function SiteLogo({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2">
       <LogoMark className="size-8" />
-      <span className={cn("font-semibold tracking-tight", compact ? "text-base" : "text-lg sm:text-xl")}>
-        <span className="text-slate-950">Actually</span>
-        <span className="text-emerald-600"> Deals</span>
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span className={cn("font-semibold tracking-tight", compact ? "text-base" : "text-lg sm:text-xl")}>
+          <span className="text-slate-950">Actually</span>
+          <span className="text-emerald-600"> Deals</span>
+        </span>
+        {compact ? null : (
+          <span className="text-[11px] font-normal tracking-normal text-slate-500">
+            Deals that are actually good!
+          </span>
+        )}
       </span>
     </span>
   );

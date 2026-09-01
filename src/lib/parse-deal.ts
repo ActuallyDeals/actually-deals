@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { attachAffiliate, cleanTrackingParams } from "@/lib/affiliate";
+import { attachAffiliate, cleanTrackingParams, withHttps } from "@/lib/affiliate";
 import { buildDanBullets, buildStackingSteps, discountPercent } from "@/lib/copy-engine";
 import { parseMoney } from "@/lib/format";
 import { preferProductPhoto, resolveDealImage } from "@/lib/images";
@@ -50,7 +50,7 @@ function isBlockedDestination(url: string, html?: string): boolean {
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) throw new ParseDealError("Paste a product URL to parse.");
-  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const withProtocol = withHttps(trimmed);
   let url: URL;
   try {
     url = new URL(withProtocol);

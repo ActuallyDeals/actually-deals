@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { DealCard } from "@/components/deal-card";
 import { Input } from "@/components/ui/input";
-import { FEED_FILTERS, isCommunityExpired, type Deal, type FeedFilter } from "@/lib/types";
+import { FEED_FILTERS, isDeadListing, type Deal, type FeedFilter } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const FILTER_LABELS: Record<FeedFilter, string> = {
@@ -42,8 +42,8 @@ export function DealFeed({
     () => deals.filter((deal) => matchesFilter(deal, filter, query)),
     [deals, filter, query],
   );
-  const live = visible.filter((deal) => !isCommunityExpired(deal));
-  const expired = visible.filter((deal) => isCommunityExpired(deal));
+  const live = visible.filter((deal) => !isDeadListing(deal));
+  const dead = visible.filter((deal) => isDeadListing(deal));
 
   if (deals.length === 0) {
     return (
@@ -93,13 +93,13 @@ export function DealFeed({
           {live.map((deal) => (
             <DealCard key={deal.id} deal={deal} />
           ))}
-          {expired.length > 0 ? (
+          {dead.length > 0 ? (
             <div className="pt-4">
               <h2 className="mb-3 text-xs font-bold tracking-wider text-slate-400 uppercase">
-                Community marked expired
+                Dead
               </h2>
               <div className="space-y-4">
-                {expired.map((deal) => (
+                {dead.map((deal) => (
                   <DealCard key={deal.id} deal={deal} />
                 ))}
               </div>

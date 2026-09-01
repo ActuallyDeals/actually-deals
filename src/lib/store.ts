@@ -376,7 +376,7 @@ export async function listPublishedDeals(): Promise<Deal[]> {
     const { data, error } = await supabase
       .from("deals")
       .select("*")
-      .eq("status", "published")
+      .in("status", ["published", "expired"])
       .order("published_at", { ascending: false });
     if (error) throw new Error(error.message);
     return hydrateDealCounts((data ?? []).map((row) => mapDealRow(row as Record<string, unknown>)));
@@ -384,7 +384,7 @@ export async function listPublishedDeals(): Promise<Deal[]> {
 
   const state = await getMemory();
   return state.deals
-    .filter((deal) => deal.status === "published")
+    .filter((deal) => deal.status === "published" || deal.status === "expired")
     .slice()
     .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
 }

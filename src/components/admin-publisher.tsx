@@ -19,6 +19,7 @@ import {
   serializeSocialDrafts,
 } from "@/lib/copy-engine";
 import { boxesToStackingSteps, staffWriteupBoxes, writeupReady } from "@/lib/editorial";
+import { withHttps } from "@/lib/affiliate";
 import { isBrandedPlaceholder } from "@/lib/images";
 import { MERCHANT_PROFILES } from "@/lib/merchants";
 import {
@@ -156,7 +157,14 @@ function draftToDeal(draft: Draft): Deal {
 }
 
 function looksLikeUrl(value: string): boolean {
-  return /^https?:\/\/\S+\.\S+/i.test(value.trim());
+  const candidate = withHttps(value);
+  if (!candidate) return false;
+  try {
+    const url = new URL(candidate);
+    return ["http:", "https:"].includes(url.protocol) && url.hostname.includes(".");
+  } catch {
+    return false;
+  }
 }
 
 function SocialDraftBox({
@@ -336,7 +344,7 @@ export function AdminPublisher({
   }
 
   async function runParse(raw: string) {
-    const target = raw.trim();
+    const target = withHttps(raw);
     if (!looksLikeUrl(target)) return;
     setParsing(true);
     setError(null);

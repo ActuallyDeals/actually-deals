@@ -8,7 +8,7 @@ export function SiteFooter() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-slate-500 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            Actually Deals is a human-edited feed. Community votes mark listings Alive or Expired.
+            Deals that are actually good!
           </p>
           <div className="flex flex-wrap gap-4">
             <Link href="/about" className="hover:text-slate-900">

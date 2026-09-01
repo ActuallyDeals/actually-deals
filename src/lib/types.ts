@@ -133,6 +133,10 @@ export function isCommunityExpired(deal: Deal): boolean {
   return total > 0 && deal.expiredVotes / total > 0.7;
 }
 
+export function isDeadListing(deal: Deal): boolean {
+  return deal.status === "expired" || isCommunityExpired(deal);
+}
+
 export function percentOff(deal: Pick<Deal, "currentPrice" | "listPrice">): number | null {
   if (!deal.listPrice || deal.listPrice <= deal.currentPrice) return null;
   return Math.round(((deal.listPrice - deal.currentPrice) / deal.listPrice) * 100);

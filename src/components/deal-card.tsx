@@ -7,7 +7,7 @@ import { merchantLabel } from "@/lib/merchants";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "@/lib/disclosures";
 import { dealHasProductLink } from "@/lib/outbound";
 import { publicPriceDisplay } from "@/lib/pricing";
-import { isCommunityExpired, type Deal } from "@/lib/types";
+import { isDeadListing, type Deal } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function DealCard({
@@ -19,7 +19,7 @@ export function DealCard({
 }) {
   const staffPreview = variant === "preview";
   const price = publicPriceDisplay(deal, { staffPreview });
-  const expired = isCommunityExpired(deal);
+  const dead = isDeadListing(deal);
   const detailHref = `/deal/${deal.slug}`;
   const productLink = dealHasProductLink(deal);
 
@@ -28,7 +28,7 @@ export function DealCard({
       className={cn(
         "group relative overflow-hidden rounded-xl border border-slate-200 bg-white",
         variant === "feed" && "cursor-pointer",
-        expired && "opacity-90",
+        dead && "grayscale opacity-60",
       )}
     >
       {variant === "feed" ? (
@@ -51,9 +51,9 @@ export function DealCard({
               Coupon Stack
             </span>
           ) : null}
-          {expired ? (
+          {dead ? (
             <span className="absolute right-2 bottom-2 rounded-md bg-slate-900/85 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white uppercase">
-              Expired
+              Dead
             </span>
           ) : null}
         </div>

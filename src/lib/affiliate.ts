@@ -78,6 +78,13 @@ function isTrackingParam(key: string): boolean {
   return TRACKING_PREFIXES.some((prefix) => lower.startsWith(prefix));
 }
 
+/** Desk paste: amazon.com/dp/... still parses. */
+export function withHttps(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 export function cleanTrackingParams(rawUrl: string): string {
   let url: URL;
   try {

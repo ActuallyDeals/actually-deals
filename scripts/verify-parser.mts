@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
-import { attachAffiliate, cleanTrackingParams } from "../src/lib/affiliate.ts";
+import { attachAffiliate, cleanTrackingParams, withHttps } from "../src/lib/affiliate.ts";
 import { imageFallbackChain, resolveDealImage } from "../src/lib/images.ts";
 import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
+
+assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ2KWHS");
+assert.equal(extractMerchantProductId(withHttps("amazon.com/dp/B08PQ2KWHS"), "amazon"), "B08PQ2KWHS");
 
 const amazon =
   "https://www.amazon.com/Instant-Pot/dp/B08PQ2KWHS?tag=other-20&th=1&psc=1&utm_source=ig&pf_rd_r=ABC&ref=sr_1_1";
