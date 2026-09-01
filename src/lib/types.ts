@@ -10,6 +10,9 @@ export const MERCHANTS = [
   "kohls",
   "dicks",
   "office-depot",
+  "uber",
+  "doordash",
+  "grubhub",
   "other",
 ] as const;
 

@@ -513,7 +513,7 @@ export function AdminPublisher({
       const duplicate =
         payload.deskDuplicate && payload.deskDuplicate.slug !== editingSlug
           ? payload.deskDuplicate
-          : findDuplicateDeal([...queued, ...live], parsed.merchantProductId, editingSlug);
+          : findDuplicateDeal([...queued, ...live], parsed.merchant, parsed.merchantProductId, editingSlug);
       if (duplicate) {
         const message = deskNotice(duplicate.title);
         setNotice(message);
@@ -700,6 +700,7 @@ export function AdminPublisher({
     if (status === "published") {
       const duplicate = findDuplicateDeal(
         [...queued, ...live],
+        draft.merchant,
         draft.merchantProductId,
         editingSlug,
       );
@@ -1111,7 +1112,7 @@ export function AdminPublisher({
               onBlur={() => {
                 if (looksLikeUrl(url) && !parsedUrls.current.has(url.trim())) void runParse(url);
               }}
-              placeholder="Paste Amazon, Walmart, Target, Costco, or a deal-page URL"
+              placeholder="Paste a product, deal-page, or coupon URL"
               className="h-12 text-base font-medium"
             />
             <div className="flex items-center justify-between gap-3">
@@ -1140,7 +1141,9 @@ export function AdminPublisher({
             />
           </div>
 
-          {!couponOnly && needsPrice ? (
+          {draft.scrapeNote ? (
+            <p className="text-sm text-amber-800">{draft.scrapeNote}</p>
+          ) : !couponOnly && needsPrice ? (
             <p className="text-sm text-amber-800">
               {draft.merchant === "amazon"
                 ? "Amazon hid the price. Paste the live number from the listing tab."

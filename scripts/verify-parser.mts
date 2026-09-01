@@ -140,13 +140,17 @@ const dup = findDuplicateDeal(
     {
       slug: "live-inkind",
       title: "Inkind One eGift Card",
+      merchant: "costco",
       merchantProductId: "4000233859",
     } as never,
   ],
+  "costco",
   "4000233859",
 );
 assert.equal(dup?.slug, "live-inkind");
-assert.equal(findDuplicateDeal([dup!], "4000233859", "live-inkind"), null);
+assert.equal(findDuplicateDeal([dup!], "costco", "4000233859", "live-inkind"), null);
+assert.equal(findDuplicateDeal([dup!], "ebay", "4000233859"), null);
+assert.equal(findDuplicateDeal([dup!], "costco", null), null);
 
 
 const newegg =
@@ -212,10 +216,25 @@ assert.equal(
   "https://www.officedepot.com/a/products/1234567/",
 );
 
-for (const merchant of ["newegg", "ebay", "kohls", "dicks", "office-depot"] as const) {
+for (const merchant of ["newegg", "ebay", "kohls", "dicks", "office-depot", "uber", "doordash", "grubhub"] as const) {
   const image = resolveDealImage({ scrapedImageUrl: null, merchant, merchantProductId: "x" });
   assert.equal(image.imageTier, "placeholder");
   assert.equal(image.imageUrl, "/placeholders/other.svg");
 }
+
+assert.equal(detectMerchant("https://www.uber.com/us/en/eats"), "uber");
+assert.equal(detectMerchant("https://www.ubereats.com/promo"), "uber");
+assert.equal(detectMerchant("https://www.postmates.com/"), "uber");
+assert.equal(detectMerchant("https://www.doordash.com/deals"), "doordash");
+assert.equal(detectMerchant("https://www.grubhub.com/lets-eat"), "grubhub");
+assert.equal(extractMerchantProductId("https://www.ubereats.com/promo", "uber"), null);
+assert.equal(extractMerchantProductId("https://www.doordash.com/store/123", "doordash"), null);
+assert.equal(extractMerchantProductId("https://www.grubhub.com/lets-eat", "grubhub"), null);
+assert.equal(canonicalSourceUrl("uber", null, "https://www.ubereats.com/promo"), "https://www.ubereats.com/promo");
+assert.equal(attachAffiliate("https://www.doordash.com/deals", "doordash").includes("goto."), false);
+assert.equal(
+  isCouponOnlyDeal({ promoCode: "EATS20", sourceUrl: "https://www.ubereats.com/promo", merchant: "uber" }),
+  true,
+);
 
 console.log("parser verification passed");

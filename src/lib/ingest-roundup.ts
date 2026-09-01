@@ -3,7 +3,7 @@ import type { AnyNode } from "domhandler";
 import { attachAffiliate, cleanTrackingParams, withHttps } from "@/lib/affiliate";
 import { buildDanBullets, buildStackingSteps, discountPercent } from "@/lib/copy-engine";
 import { parseMoney } from "@/lib/format";
-import { resolveDealImage } from "@/lib/images";
+import { cdnImageFor, resolveDealImage } from "@/lib/images";
 import { detectMerchant, extractMerchantProductId } from "@/lib/merchants";
 import { isDirectRetailerListing, isRetailerShortUrl } from "@/lib/outbound";
 import {
@@ -228,7 +228,7 @@ function parsedFromCandidate(
       ? "Short link did not unwrap. Confirm the retailer URL before Ready."
       : null,
     currentPrice == null ? "Paste the live price from the listing. Do not invent one." : null,
-    image.imageTier === "placeholder"
+    image.imageTier === "placeholder" && !cdnImageFor(merchant, productId)
       ? "Paste the product Image URL from the listing. Do not generate a lifestyle shot."
       : null,
   ]

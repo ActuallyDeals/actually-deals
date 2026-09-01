@@ -3,7 +3,7 @@ import { attachAffiliate, cleanTrackingParams, withHttps } from "@/lib/affiliate
 import { isRetailerShortUrl } from "@/lib/outbound";
 import { buildDanBullets, buildStackingSteps, discountPercent } from "@/lib/copy-engine";
 import { parseMoney } from "@/lib/format";
-import { preferProductPhoto, resolveDealImage } from "@/lib/images";
+import { cdnImageFor, preferProductPhoto, resolveDealImage } from "@/lib/images";
 import { giftCardFaceValue } from "@/lib/pricing";
 import {
   detectMerchant,
@@ -238,7 +238,7 @@ function extractFromHtml(html: string, merchant: Merchant): {
   }
 
   if (title) {
-    title = title.replace(/\s*[|\-–].{0,40}(Amazon|Walmart|Target|Home Depot|Best Buy|Newegg|eBay|Kohl'?s|Dick'?s|Office Depot|Costco).*$/i, "").trim();
+    title = title.replace(/\s*[|\-–].{0,40}(Amazon|Walmart|Target|Home Depot|Best Buy|Newegg|eBay|Kohl'?s|Dick'?s|Office Depot|Costco|Uber|DoorDash|Grubhub|Postmates).*$/i, "").trim();
   }
 
   return { title, currentPrice, listPrice, scrapedImageUrl };
@@ -427,6 +427,9 @@ function fallbackTitle(merchant: Merchant, productId: string | null, url: string
       kohls: `Kohl's item ${productId}`,
       dicks: `Dick's item ${productId}`,
       "office-depot": `Office Depot item ${productId}`,
+      uber: `Uber item ${productId}`,
+      doordash: `DoorDash item ${productId}`,
+      grubhub: `Grubhub item ${productId}`,
       other: "Untitled deal",
     };
     return labels[merchant];
@@ -576,7 +579,7 @@ export async function parseDealUrl(rawUrl: string): Promise<ParsedDeal> {
       currentPrice == null
         ? "Paste the live price from the tab — do not invent one."
         : null,
-      image.imageTier === "placeholder"
+      image.imageTier === "placeholder" && !cdnImageFor(merchant, merchantProductId)
         ? "Paste the product Image URL from the listing. Do not generate a lifestyle shot."
         : null,
     ]

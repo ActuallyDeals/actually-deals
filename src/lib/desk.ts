@@ -1,4 +1,4 @@
-import type { Deal } from "@/lib/types";
+import type { Deal, Merchant } from "@/lib/types";
 
 export function normalizeMerchantProductId(id: string | null | undefined): string | null {
   const trimmed = id?.trim();
@@ -8,6 +8,7 @@ export function normalizeMerchantProductId(id: string | null | undefined): strin
 
 export function findDuplicateDeal(
   deals: Deal[],
+  merchant: Merchant,
   merchantProductId: string | null | undefined,
   exceptSlug?: string | null,
 ): Deal | null {
@@ -16,6 +17,7 @@ export function findDuplicateDeal(
   return (
     deals.find((deal) => {
       if (exceptSlug && deal.slug === exceptSlug) return false;
+      if (deal.merchant !== merchant) return false;
       return normalizeMerchantProductId(deal.merchantProductId) === id;
     }) ?? null
   );

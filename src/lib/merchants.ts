@@ -74,6 +74,24 @@ export const MERCHANT_PROFILES: Record<Merchant, MerchantProfile> = {
     hostMatches: ["officedepot.", "officemax."],
     color: "#CC0000",
   },
+  uber: {
+    id: "uber",
+    label: "Uber",
+    hostMatches: ["uber.com", "ubereats.com", "postmates.com"],
+    color: "#000000",
+  },
+  doordash: {
+    id: "doordash",
+    label: "DoorDash",
+    hostMatches: ["doordash.com"],
+    color: "#FF3008",
+  },
+  grubhub: {
+    id: "grubhub",
+    label: "Grubhub",
+    hostMatches: ["grubhub.com"],
+    color: "#F63440",
+  },
   other: {
     id: "other",
     label: "Store",
@@ -185,6 +203,10 @@ export function extractMerchantProductId(rawUrl: string, merchant: Merchant): st
         if (candidate && /^\d+$/.test(candidate)) return candidate;
         return null;
       }
+      case "uber":
+      case "doordash":
+      case "grubhub":
+        return null;
       default:
         return null;
     }

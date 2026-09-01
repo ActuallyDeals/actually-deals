@@ -14,6 +14,7 @@ import type {
   Deal,
   DealComment,
   DealVote,
+  Merchant,
   PublishDealInput,
   QueueStage,
   VoteChoice,
@@ -433,11 +434,12 @@ export async function listAllDeals(): Promise<Deal[]> {
 
 
 export async function findDeskDuplicate(
+  merchant: Merchant,
   merchantProductId: string | null | undefined,
   exceptSlug?: string | null,
 ): Promise<Deal | null> {
   const [queued, published] = await Promise.all([listQueuedDeals(), listPublishedDeals()]);
-  return findDuplicateDeal([...queued, ...published], merchantProductId, exceptSlug);
+  return findDuplicateDeal([...queued, ...published], merchant, merchantProductId, exceptSlug);
 }
 
 export async function getDealBySlug(slug: string): Promise<Deal | null> {
@@ -507,7 +509,7 @@ export async function publishDeal(input: PublishDealInput): Promise<Deal> {
 export async function saveDeal(input: PublishDealInput, previousSlug?: string): Promise<Deal> {
   validateDealInput(input);
   if ((input.status ?? "published") === "published") {
-    const duplicate = await findDeskDuplicate(input.merchantProductId ?? null, previousSlug);
+    const duplicate = await findDeskDuplicate(input.merchant, input.merchantProductId ?? null, previousSlug);
     if (duplicate) {
       throw new Error(`Already on the desk: ${duplicate.title}`);
     }
