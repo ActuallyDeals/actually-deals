@@ -343,10 +343,12 @@ export function AdminPublisher({
   persistence: _persistence,
   queued,
   live,
+  socialAutoPost,
 }: {
   persistence: "supabase" | "local";
   queued: Deal[];
   live: Deal[];
+  socialAutoPost: boolean;
 }) {
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -1267,6 +1269,11 @@ export function AdminPublisher({
                       ? "Save live deal"
                       : "Publish to the site"}
           </Button>
+          <p className="text-xs text-slate-500">
+            {socialAutoPost
+              ? "Publish also posts to X, Instagram, and Facebook."
+              : "Social auto-post is off. Publish still goes to the site."}
+          </p>
           <div className="grid grid-cols-3 gap-2">
             <Button
               type="button"

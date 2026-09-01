@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { isAdmin, isAdminConfigured } from "@/lib/auth";
 import { listPublishedDeals, listQueuedDeals } from "@/lib/store";
+import { socialAutoPostEnabled } from "@/lib/social-post";
 import { persistenceMode } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function AdminPage() {
                 Affiliate settings
               </a>
             </div>
-            <AdminPublisher persistence={persistenceMode()} queued={queued} live={live} />
+            <AdminPublisher persistence={persistenceMode()} queued={queued} live={live} socialAutoPost={socialAutoPostEnabled()} />
           </div>
         ) : (
           <AdminLogin />
