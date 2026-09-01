@@ -1,5 +1,7 @@
+import { buildDanBullets } from "@/lib/copy-engine";
 import { formatUsd } from "@/lib/format";
 import { merchantLabel } from "@/lib/merchants";
+import { isAppCouponMerchant } from "@/lib/outbound";
 import type { Merchant } from "@/lib/types";
 
 const TITLE_PREFIX = /^(?:\[[^\]]+\]\s*)?\$[\d,.]+?\*?\s*\|\s*/i;
@@ -13,7 +15,7 @@ export function stackTags(clipCoupon: boolean, subscribeSave: boolean, promoCode
 }
 
 export function productNameFromTitle(title: string): string {
-  return title.replace(TITLE_PREFIX, "").replace(/\s+at (?:Amazon|Walmart|Target|Home Depot|Best Buy|Costco)$/i, "").trim() || title.trim();
+  return title.replace(TITLE_PREFIX, "").replace(/\s+at (?:Amazon|Walmart|Target|Home Depot|Best Buy|Costco|Uber|DoorDash|Grubhub|Postmates|Newegg|eBay|Kohl's|Dick's|Office Depot)$/i, "").trim() || title.trim();
 }
 
 export function inferStackFromTitle(title: string): { clipCoupon: boolean; subscribeSave: boolean } {
@@ -50,7 +52,12 @@ export function stackedHeadline(input: {
   promoCode: string;
 }): string {
   const name = productNameFromTitle(input.title);
-  const tags = stackTags(input.clipCoupon, input.subscribeSave, input.promoCode);
+  const delivery = isAppCouponMerchant(input.merchant);
+  const tags = stackTags(
+    delivery ? false : input.clipCoupon,
+    delivery ? false : input.subscribeSave,
+    input.promoCode,
+  );
   if (input.currentPrice == null || tags.length === 0) return name;
   const star = "*";
   const store = merchantLabel(input.merchant);
@@ -58,12 +65,25 @@ export function stackedHeadline(input: {
 }
 
 export function stackedWhyNote(input: {
+  merchant?: Merchant;
   currentPrice: number | null;
   clipCoupon: boolean;
   subscribeSave: boolean;
   promoCode: string;
 }): string {
   const pay = input.currentPrice != null ? money(input.currentPrice) : null;
+  const code = input.promoCode.trim();
+  if (input.merchant && isAppCouponMerchant(input.merchant)) {
+    const store = merchantLabel(input.merchant);
+    if (code) {
+      return pay
+        ? `Enter code ${code} in the ${store} app; you should see ${pay}.`
+        : `Enter code ${code} in the ${store} app, then confirm the total.`;
+    }
+    return pay
+      ? `Pay ${pay} in the ${store} app. Confirm the total before you pay.`
+      : `Confirm the live total in the ${store} app before you pay.`;
+  }
   if (input.clipCoupon && input.subscribeSave) {
     return pay
       ? `Clip the coupon and turn on Subscribe & Save; cart should be ${pay}.`
@@ -98,6 +118,15 @@ export function stackedBullets(input: {
   promoCode: string;
 }): string[] {
   const store = merchantLabel(input.merchant);
+  if (isAppCouponMerchant(input.merchant)) {
+    return buildDanBullets({
+      merchant: input.merchant,
+      currentPrice: input.currentPrice,
+      listPrice: input.listPrice,
+      percentOff: null,
+      promoCode: input.promoCode.trim() || null,
+    });
+  }
   const pay = input.currentPrice != null ? money(input.currentPrice) : null;
   const was =
     input.listPrice != null &&

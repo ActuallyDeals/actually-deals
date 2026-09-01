@@ -1,6 +1,7 @@
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "@/lib/disclosures";
 import { formatUsd } from "@/lib/format";
 import { merchantLabel } from "@/lib/merchants";
+import { isAppCouponDeal } from "@/lib/outbound";
 import { SOCIAL } from "@/lib/social";
 import type { Merchant, StackingStep } from "@/lib/types";
 
@@ -29,10 +30,38 @@ export function buildDanBullets(input: {
   listPrice: number | null;
   percentOff: number | null;
   promoCode: string | null;
+  sourceUrl?: string | null;
 }): string[] {
   const store = merchantLabel(input.merchant);
   const price = input.currentPrice != null ? formatUsd(input.currentPrice) : null;
   const list = input.listPrice != null ? formatUsd(input.listPrice) : null;
+  const code = input.promoCode?.trim() || "";
+
+  if (
+    isAppCouponDeal({
+      merchant: input.merchant,
+      promoCode: input.promoCode,
+      sourceUrl: input.sourceUrl,
+    })
+  ) {
+    const withCode = code ? ` with code ${code}` : "";
+    const priceText =
+      price && list
+        ? `${price} off ${list} at ${store}${withCode}. Confirm it still works in the app.`
+        : price && code
+          ? `${price} at ${store} with code ${code}. Confirm it still works in the app.`
+          : price
+            ? `${price} at ${store}. Confirm the total in the app.`
+            : code
+              ? `Code ${code} at ${store}. Confirm it still works in the app.`
+              : `See the live offer in the ${store} app. Do not guess from memory.`;
+    const feesText = "Fees, minimums, and other terms show in the app. Check them before you pay.";
+    const actionText = code
+      ? `Enter ${code} in the app at checkout, then confirm the discount took.`
+      : "Add the code at checkout in the app, then confirm the discount took.";
+    return [priceText, feesText, actionText];
+  }
+
   const priceText =
     price && list && input.percentOff
       ? `${price} (was ${list}) · ${input.percentOff}% off recent street.`
@@ -56,9 +85,40 @@ export function buildStackingSteps(input: {
   merchant: Merchant;
   promoCode: string | null;
   currentPrice: number | null;
+  sourceUrl?: string | null;
 }): StackingStep[] {
   const store = merchantLabel(input.merchant);
   const price = input.currentPrice != null ? formatUsd(input.currentPrice) : null;
+  const code = input.promoCode?.trim() || "";
+
+  if (
+    isAppCouponDeal({
+      merchant: input.merchant,
+      promoCode: input.promoCode,
+      sourceUrl: input.sourceUrl,
+    })
+  ) {
+    return [
+      {
+        step: 1,
+        title: `Open the ${store} app`,
+        detail: `Open the ${store} app and start your order.`,
+      },
+      {
+        step: 2,
+        title: code ? `Enter ${code}` : "Add the code at checkout",
+        detail: code
+          ? `Enter ${code} in the promo field before you pay.`
+          : "Add the code at checkout if you have one.",
+      },
+      {
+        step: 3,
+        title: "Confirm the discount",
+        detail: "Confirm the discount and the total before you pay.",
+      },
+    ];
+  }
+
   return [
     {
       step: 1,
@@ -83,7 +143,7 @@ export function buildStackingSteps(input: {
 function shortDealName(title: string): string {
   let name = title.trim();
   name = name.replace(
-    /^(price mistake|coupon stack|walmart|target|amazon|home depot|best buy|circle)[:\-–]\s*/i,
+    /^(price mistake|coupon stack|walmart|target|amazon|home depot|best buy|circle|uber|doordash|grubhub|postmates)[:\-–]\s*/i,
     "",
   );
   name = name.replace(/\s*(drops? to|for only|only|for|at)\s+\$[\d,.]+.*$/i, "");

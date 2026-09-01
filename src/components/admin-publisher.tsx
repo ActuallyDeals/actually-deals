@@ -28,7 +28,7 @@ import {
 import { boxesToStackingSteps, staffWriteupBoxes, writeupReady } from "@/lib/editorial";
 import { withHttps } from "@/lib/affiliate";
 import { isBrandedPlaceholder, resolveDealImage } from "@/lib/images";
-import { isCouponOnlyDeal } from "@/lib/outbound";
+import { isAppCouponMerchant, isCouponOnlyDeal } from "@/lib/outbound";
 import { MERCHANT_PROFILES } from "@/lib/merchants";
 import { giftCardFaceValue } from "@/lib/pricing";
 import { findDuplicateDeal } from "@/lib/desk";
@@ -310,11 +310,11 @@ function applyStackToDraft(current: Draft, patch: Partial<Draft> = {}): Draft {
       promoCode: next.promoCode,
     });
     const generic =
-      !current.bullets[0] ||
-      /do not guess|see the live price|clip the on-page|subscribe & save|confirm the total/i.test(
-        current.bullets[0],
+      !current.bullets[0]?.trim() ||
+      /do not guess|see the live price|clip the on-page|clip any on-page|subscribe & save|confirm the total|prime shipping|get deal|free store pickup/i.test(
+        current.bullets.join(" "),
       );
-    if (live != null && generic) {
+    if (generic) {
       next.bullets = stackedBullets({
         merchant: next.merchant,
         currentPrice: live,
@@ -658,6 +658,7 @@ export function AdminPublisher({
       listPrice: list,
       percentOff: discountPercent(pay, list),
       promoCode: from.promoCode || null,
+      sourceUrl: from.sourceUrl || url,
     });
   }
 
@@ -929,11 +930,12 @@ export function AdminPublisher({
         /do not guess|see the live price/i.test(current.bullets[0]);
       if (pay != null && genericBullet && !next.clipCoupon && !next.subscribeSave) {
         next.bullets = buildDanBullets({
-          merchant: current.merchant,
+          merchant: next.merchant,
           currentPrice: pay,
           listPrice: list,
           percentOff: discountPercent(pay, list),
-          promoCode: current.promoCode || null,
+          promoCode: next.promoCode || null,
+          sourceUrl: next.sourceUrl || url,
         });
       }
       return next;
@@ -959,18 +961,23 @@ export function AdminPublisher({
         currentPrice: rewritten.currentPrice,
         listPrice,
         summary: stackedWhyNote({
+          merchant: current.merchant,
           currentPrice: live,
           clipCoupon: rewritten.clipCoupon,
           subscribeSave: rewritten.subscribeSave,
           promoCode: rewritten.promoCode,
         }),
-        stackNote: [
-          rewritten.clipCoupon ? "Clip the on-page coupon." : "",
-          rewritten.subscribeSave ? "Turn on Subscribe & Save." : "",
-          rewritten.promoCode ? `Code ${rewritten.promoCode} at checkout.` : "",
-        ]
-          .filter(Boolean)
-          .join(" ") || current.stackNote,
+        stackNote: isAppCouponMerchant(current.merchant)
+          ? rewritten.promoCode
+            ? `Enter ${rewritten.promoCode} in the app, then confirm the discount took.`
+            : "Add the code at checkout in the app."
+          : [
+              rewritten.clipCoupon ? "Clip the on-page coupon." : "",
+              rewritten.subscribeSave ? "Turn on Subscribe & Save." : "",
+              rewritten.promoCode ? `Code ${rewritten.promoCode} at checkout.` : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || current.stackNote,
         verifyNote: rewritten.currentPrice
           ? `Cart should match $${rewritten.currentPrice} after the stack. Skip it if it does not.`
           : current.verifyNote,

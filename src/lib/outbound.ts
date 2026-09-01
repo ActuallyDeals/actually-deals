@@ -51,6 +51,10 @@ export function isDirectRetailerListing(rawUrl: string, merchant: Merchant): boo
   return isProductOutboundUrl(rawUrl, merchant);
 }
 
+export function isAppCouponMerchant(merchant: Merchant): boolean {
+  return merchant === "uber" || merchant === "doordash" || merchant === "grubhub";
+}
+
 /** Food/delivery (or other) coupon with a code and no product deep link. */
 export function isCouponOnlyDeal(deal: {
   promoCode?: string | null;
@@ -65,5 +69,16 @@ export function isCouponOnlyDeal(deal: {
   } catch {
     return true;
   }
+}
+
+/** Delivery app, or a promo code with no product listing when sourceUrl is supplied. */
+export function isAppCouponDeal(deal: {
+  merchant: Merchant;
+  promoCode?: string | null;
+  sourceUrl?: string | null;
+}): boolean {
+  if (isAppCouponMerchant(deal.merchant)) return true;
+  if (deal.sourceUrl === undefined) return false;
+  return isCouponOnlyDeal(deal);
 }
 

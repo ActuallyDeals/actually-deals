@@ -351,6 +351,7 @@ function toDealFromInput(input: PublishDealInput, existingSlugs: Set<string>, pr
         merchant,
         promoCode: input.promoCode?.trim() || null,
         currentPrice,
+        sourceUrl,
       }),
     socialPost:
       input.socialPost?.trim() ||
