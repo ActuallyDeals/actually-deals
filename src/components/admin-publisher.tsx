@@ -27,9 +27,10 @@ import {
 } from "@/lib/stack-copy";
 import { boxesToStackingSteps, staffWriteupBoxes, writeupReady } from "@/lib/editorial";
 import { withHttps } from "@/lib/affiliate";
+import { formatUsd } from "@/lib/format";
 import { isBrandedPlaceholder, resolveDealImage } from "@/lib/images";
 import { isAppCouponMerchant, isCouponOnlyDeal } from "@/lib/outbound";
-import { MERCHANT_PROFILES } from "@/lib/merchants";
+import { MERCHANT_PROFILES, merchantLabel } from "@/lib/merchants";
 import { giftCardFaceValue } from "@/lib/pricing";
 import { findDuplicateDeal } from "@/lib/desk";
 import {
@@ -45,6 +46,12 @@ import {
 } from "@/lib/types";
 
 const EMPTY_BULLETS = ["", "", ""];
+
+function queueRowMeta(item: Deal): string {
+  const price =
+    typeof item.currentPrice === "number" ? formatUsd(item.currentPrice) : "price needed";
+  return [merchantLabel(item.merchant), price, item.promoCode || undefined].filter(Boolean).join(" · ");
+}
 
 interface Draft {
   sourceUrl: string;
@@ -1055,6 +1062,7 @@ export function AdminPublisher({
                     {item.queueStage}
                   </span>
                   <span className="line-clamp-2 text-xs font-semibold text-slate-900">{item.title}</span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">{queueRowMeta(item)}</span>
                 </button>
               </li>
             ))
@@ -1085,6 +1093,7 @@ export function AdminPublisher({
                       <span className={`line-clamp-2 text-xs font-semibold ${dead ? "text-slate-500" : "text-slate-900"}`}>
                         {item.title}
                       </span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">{queueRowMeta(item)}</span>
                     </button>
                     <button
                       type="button"
