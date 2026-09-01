@@ -44,6 +44,36 @@ export const MERCHANT_PROFILES: Record<Merchant, MerchantProfile> = {
     hostMatches: ["costco."],
     color: "#E31837",
   },
+  newegg: {
+    id: "newegg",
+    label: "Newegg",
+    hostMatches: ["newegg."],
+    color: "#E57200",
+  },
+  ebay: {
+    id: "ebay",
+    label: "eBay",
+    hostMatches: ["ebay.", "ebay.us"],
+    color: "#E53238",
+  },
+  kohls: {
+    id: "kohls",
+    label: "Kohl's",
+    hostMatches: ["kohls."],
+    color: "#702F8A",
+  },
+  dicks: {
+    id: "dicks",
+    label: "Dick's",
+    hostMatches: ["dickssportinggoods."],
+    color: "#046A38",
+  },
+  "office-depot": {
+    id: "office-depot",
+    label: "Office Depot",
+    hostMatches: ["officedepot.", "officemax."],
+    color: "#CC0000",
+  },
   other: {
     id: "other",
     label: "Store",
@@ -112,6 +142,47 @@ export function extractMerchantProductId(rawUrl: string, merchant: Merchant): st
           const seg = segments[i].replace(/\.(?:html|product).*$/i, "");
           if (/^\d{6,}$/.test(seg)) return seg;
         }
+        return null;
+      }
+      case "newegg": {
+        const fromPath = path.match(/\/p\/(N82E\d+|9SI[A-Z0-9]+)/i)?.[1];
+        const fromQuery = url.searchParams.get("Item") ?? url.searchParams.get("item");
+        const candidate = fromPath ?? fromQuery;
+        if (candidate && /^(N82E\d+|9SI[A-Z0-9]+)$/i.test(candidate)) {
+          return candidate.toUpperCase();
+        }
+        return null;
+      }
+      case "ebay": {
+        const fromPath = path.match(/\/itm\/(?:[^/]+\/)?(\d{9,15})(?:\/|$)/)?.[1];
+        const fromQuery = url.searchParams.get("item") ?? url.searchParams.get("itm");
+        const candidate = fromPath ?? fromQuery;
+        if (candidate && /^\d{9,15}$/.test(candidate)) return candidate;
+        return null;
+      }
+      case "kohls": {
+        const fromPath = path.match(/\/prd-(\d+)/i)?.[1];
+        const fromQuery = url.searchParams.get("prd") ?? url.searchParams.get("productId");
+        const candidate = fromPath ?? fromQuery;
+        if (candidate && /^\d+$/.test(candidate)) return candidate;
+        return null;
+      }
+      case "dicks": {
+        const fromQuery = url.searchParams.get("productId") ?? url.searchParams.get("sku");
+        if (fromQuery && /^[A-Za-z0-9-]{4,40}$/.test(fromQuery)) return fromQuery;
+        const segments = path.split("/").filter(Boolean);
+        const pIndex = segments.findIndex((seg) => seg.toLowerCase() === "p");
+        if (pIndex >= 0) {
+          const last = segments[segments.length - 1].replace(/\.(?:html|jsp).*$/i, "");
+          if (/^\d{5,}$/.test(last)) return last;
+        }
+        return null;
+      }
+      case "office-depot": {
+        const fromPath = path.match(/\/a\/products\/(\d+)/i)?.[1];
+        const fromQuery = url.searchParams.get("productId") ?? url.searchParams.get("sku");
+        const candidate = fromPath ?? fromQuery;
+        if (candidate && /^\d+$/.test(candidate)) return candidate;
         return null;
       }
       default:

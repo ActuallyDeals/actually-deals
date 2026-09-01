@@ -30,6 +30,8 @@ const RETAILER_SHORT_HOSTS = [
   "tgt.biz",
   "thd.co",
   "bbyurl.us",
+  "ebay.us",
+  "ebay.to",
 ];
 
 /** Amazon/Walmart/Target/etc short links that still need an unwrap to a product URL. */

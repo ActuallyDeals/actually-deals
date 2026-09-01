@@ -6,7 +6,7 @@ import { extractRetailerCandidates } from "../src/lib/ingest-roundup.ts";
 import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
 import { canonicalSourceUrl, titleFromProductUrl } from "../src/lib/parse-deal.ts";
 import { giftCardFaceValue } from "../src/lib/pricing.ts";
-import { isCouponOnlyDeal, isDirectRetailerListing } from "../src/lib/outbound.ts";
+import { isCouponOnlyDeal, isDirectRetailerListing, isRetailerShortUrl } from "../src/lib/outbound.ts";
 import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
 
 assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ2KWHS");
@@ -147,5 +147,75 @@ const dup = findDuplicateDeal(
 );
 assert.equal(dup?.slug, "live-inkind");
 assert.equal(findDuplicateDeal([dup!], "4000233859", "live-inkind"), null);
+
+
+const newegg =
+  "https://www.newegg.com/amd-ryzen-7-9800x3d/p/N82E16819113877?Item=N82E16819113877&cm_mmc=track";
+assert.equal(detectMerchant(newegg), "newegg");
+assert.equal(extractMerchantProductId(newegg, "newegg"), "N82E16819113877");
+assert.equal(
+  extractMerchantProductId("https://www.newegg.com/Product/Product.aspx?Item=9SIA19UK8T1234", "newegg"),
+  "9SIA19UK8T1234",
+);
+assert.equal(extractMerchantProductId("https://www.newegg.com/p/pl?d=ssd", "newegg"), null);
+assert.equal(titleFromProductUrl(newegg, "newegg", "N82E16819113877"), "Amd Ryzen 7 9800x3d");
+assert.equal(canonicalSourceUrl("newegg", "N82E16819113877", newegg), "https://www.newegg.com/p/N82E16819113877");
+assert.equal(attachAffiliate(newegg, "newegg").includes("goto."), false);
+assert.equal(attachAffiliate(newegg, "newegg").includes("cm_mmc"), false);
+
+const ebay = "https://www.ebay.com/itm/sony-wh-1000xm5/256890123456?hash=item&utm_source=x";
+assert.equal(detectMerchant(ebay), "ebay");
+assert.equal(detectMerchant("https://ebay.us/m/abc"), "ebay");
+assert.equal(extractMerchantProductId(ebay, "ebay"), "256890123456");
+assert.equal(extractMerchantProductId("https://www.ebay.com/itm/256890123456", "ebay"), "256890123456");
+assert.equal(extractMerchantProductId("https://www.ebay.com/itm/not-an-id", "ebay"), null);
+assert.equal(titleFromProductUrl(ebay, "ebay", "256890123456"), "Sony Wh 1000xm5");
+assert.equal(canonicalSourceUrl("ebay", "256890123456", ebay), "https://www.ebay.com/itm/256890123456");
+assert.equal(isRetailerShortUrl("https://ebay.us/m/abc"), true);
+assert.equal(isRetailerShortUrl("https://ebay.to/xyz"), true);
+
+const kohls = "https://www.kohls.com/product/prd-3949587/nike-air-max-90-shoes.jsp?utm_campaign=x";
+assert.equal(detectMerchant(kohls), "kohls");
+assert.equal(extractMerchantProductId(kohls, "kohls"), "3949587");
+assert.equal(extractMerchantProductId("https://www.kohls.com/catalog.jsp?productId=3949587", "kohls"), "3949587");
+assert.equal(titleFromProductUrl(kohls, "kohls", "3949587"), "Nike Air Max 90 Shoes");
+assert.equal(
+  canonicalSourceUrl("kohls", "3949587", kohls),
+  "https://www.kohls.com/product/prd-3949587/nike-air-max-90-shoes.jsp",
+);
+assert.equal(
+  canonicalSourceUrl("kohls", "3949587", "https://www.kohls.com/catalog.jsp?prd=3949587"),
+  "https://www.kohls.com/product/prd-3949587/",
+);
+
+const dicks = "https://www.dickssportinggoods.com/p/yeti-rambler-20-oz/21218426?utm_source=x";
+assert.equal(detectMerchant(dicks), "dicks");
+assert.equal(extractMerchantProductId(dicks, "dicks"), "21218426");
+assert.equal(
+  extractMerchantProductId("https://www.dickssportinggoods.com/p/foo?sku=21NIK123", "dicks"),
+  "21NIK123",
+);
+assert.equal(titleFromProductUrl(dicks, "dicks", "21218426"), "Yeti Rambler 20 Oz");
+assert.equal(
+  canonicalSourceUrl("dicks", "21218426", dicks),
+  "https://www.dickssportinggoods.com/p/yeti-rambler-20-oz/21218426",
+);
+
+const office =
+  "https://www.officedepot.com/a/products/1234567/HP-Black-Ink/?cm_mmc=track";
+assert.equal(detectMerchant(office), "office-depot");
+assert.equal(detectMerchant("https://www.officemax.com/a/products/1234567/"), "office-depot");
+assert.equal(extractMerchantProductId(office, "office-depot"), "1234567");
+assert.equal(titleFromProductUrl(office, "office-depot", "1234567"), "HP Black Ink");
+assert.equal(
+  canonicalSourceUrl("office-depot", "1234567", office),
+  "https://www.officedepot.com/a/products/1234567/",
+);
+
+for (const merchant of ["newegg", "ebay", "kohls", "dicks", "office-depot"] as const) {
+  const image = resolveDealImage({ scrapedImageUrl: null, merchant, merchantProductId: "x" });
+  assert.equal(image.imageTier, "placeholder");
+  assert.equal(image.imageUrl, "/placeholders/other.svg");
+}
 
 console.log("parser verification passed");

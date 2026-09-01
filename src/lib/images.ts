@@ -4,8 +4,16 @@ import type { Merchant } from "@/lib/types";
 export type ImageTier = "scraped" | "cdn" | "placeholder";
 
 export function brandedPlaceholder(merchant: Merchant): string {
-  if (merchant === "costco") return "/placeholders/other.svg";
-  return `/placeholders/${merchant}.svg`;
+  if (
+    merchant === "amazon" ||
+    merchant === "walmart" ||
+    merchant === "target" ||
+    merchant === "home-depot" ||
+    merchant === "best-buy"
+  ) {
+    return `/placeholders/${merchant}.svg`;
+  }
+  return "/placeholders/other.svg";
 }
 
 export function isBrandedPlaceholder(value: string | null | undefined): boolean {

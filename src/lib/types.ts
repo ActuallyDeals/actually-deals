@@ -5,6 +5,11 @@ export const MERCHANTS = [
   "home-depot",
   "best-buy",
   "costco",
+  "newegg",
+  "ebay",
+  "kohls",
+  "dicks",
+  "office-depot",
   "other",
 ] as const;
 

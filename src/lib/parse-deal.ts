@@ -238,7 +238,7 @@ function extractFromHtml(html: string, merchant: Merchant): {
   }
 
   if (title) {
-    title = title.replace(/\s*[|\-–].{0,40}(Amazon|Walmart|Target|Home Depot|Best Buy).*$/i, "").trim();
+    title = title.replace(/\s*[|\-–].{0,40}(Amazon|Walmart|Target|Home Depot|Best Buy|Newegg|eBay|Kohl'?s|Dick'?s|Office Depot|Costco).*$/i, "").trim();
   }
 
   return { title, currentPrice, listPrice, scrapedImageUrl };
@@ -374,12 +374,24 @@ export function titleFromProductUrl(
         return displaySlugTitle(parts[site + 1]);
       }
     }
-    if (merchant === "costco") {
+    if (
+      merchant === "costco" ||
+      merchant === "newegg" ||
+      merchant === "ebay" ||
+      merchant === "kohls" ||
+      merchant === "dicks" ||
+      merchant === "office-depot"
+    ) {
+      const skip = new Set(["p", "-", "itm", "product", "products", "a"]);
       for (let i = parts.length - 1; i >= 0; i -= 1) {
-        if (productId && parts[i].replace(/\.(?:html|product).*$/i, "") === productId) continue;
-        if (parts[i] === "p" || parts[i] === "-") continue;
-        if (/^\d+$/.test(parts[i])) continue;
-        const seg = displaySlugTitle(parts[i]);
+        const raw = parts[i].replace(/\.(?:html|jsp|aspx|product).*$/i, "");
+        if (productId && (raw === productId || raw.toLowerCase() === productId.toLowerCase())) continue;
+        if (productId && raw.includes(productId)) continue;
+        if (skip.has(raw.toLowerCase())) continue;
+        if (/^prd-\d+$/i.test(raw)) continue;
+        if (/^(N82E\d+|9SI[A-Z0-9]+)$/i.test(raw)) continue;
+        if (/^\d+$/.test(raw)) continue;
+        const seg = displaySlugTitle(raw);
         if (seg.length > 3) return seg;
       }
     }
@@ -410,6 +422,11 @@ function fallbackTitle(merchant: Merchant, productId: string | null, url: string
       "home-depot": `Home Depot SKU ${productId}`,
       "best-buy": `Best Buy SKU ${productId}`,
       costco: `Costco item ${productId}`,
+      newegg: `Newegg item ${productId}`,
+      ebay: `eBay item ${productId}`,
+      kohls: `Kohl's item ${productId}`,
+      dicks: `Dick's item ${productId}`,
+      "office-depot": `Office Depot item ${productId}`,
       other: "Untitled deal",
     };
     return labels[merchant];
@@ -444,6 +461,33 @@ export function canonicalSourceUrl(merchant: Merchant, productId: string | null,
     } catch {
       return cleanedUrl;
     }
+  }
+  if (merchant === "newegg" && productId) return `https://www.newegg.com/p/${productId}`;
+  if (merchant === "ebay" && productId) return `https://www.ebay.com/itm/${productId}`;
+  if (merchant === "kohls" && productId) {
+    try {
+      const parsed = new URL(cleanedUrl);
+      parsed.search = "";
+      parsed.hash = "";
+      if (parsed.pathname.includes(`prd-${productId}`)) return parsed.toString();
+    } catch {
+      // ignore
+    }
+    return `https://www.kohls.com/product/prd-${productId}/`;
+  }
+  if (merchant === "dicks" && productId) {
+    try {
+      const parsed = new URL(cleanedUrl);
+      parsed.search = "";
+      parsed.hash = "";
+      if (parsed.pathname.includes(productId)) return parsed.toString();
+    } catch {
+      // ignore
+    }
+    return `https://www.dickssportinggoods.com/p/${productId}`;
+  }
+  if (merchant === "office-depot" && productId) {
+    return `https://www.officedepot.com/a/products/${productId}/`;
   }
   return cleanedUrl;
 }
