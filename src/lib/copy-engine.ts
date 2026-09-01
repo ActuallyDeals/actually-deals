@@ -76,7 +76,7 @@ export function buildDanBullets(input: {
 
   const actionText = input.promoCode
     ? `Apply code ${input.promoCode} at checkout, then confirm the total.`
-    : "Clip any on-page coupon, then confirm the total before you pay.";
+    : `Confirm the live total at ${store} before you pay.`;
 
   return [priceText, shippingText, actionText];
 }
@@ -127,10 +127,10 @@ export function buildStackingSteps(input: {
     },
     {
       step: 2,
-      title: input.promoCode ? `Enter ${input.promoCode}` : "Clip the coupon if one is on the page",
+      title: input.promoCode ? `Enter ${input.promoCode}` : "Confirm the live total",
       detail: input.promoCode
         ? `Add the item, then apply ${input.promoCode} before you pay.`
-        : "If a store coupon is on the page, clip it before checkout.",
+        : `Confirm the live total at ${store} before you pay.`,
     },
     {
       step: 3,
