@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s · Actually Deals",
   },
   description:
-    "Human-verified shopping deals from Amazon, Walmart, Target, Home Depot, and Best Buy. Community votes keep the feed honest.",
+    "Deals that are actually good.",
   icons: {
     icon: "/icon.svg",
     apple: "/apple-icon",
