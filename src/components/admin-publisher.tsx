@@ -49,7 +49,9 @@ const EMPTY_BULLETS = ["", "", ""];
 
 function queueRowMeta(item: Deal): string {
   const price =
-    typeof item.currentPrice === "number" ? formatUsd(item.currentPrice) : "price needed";
+    typeof item.currentPrice === "number" && item.currentPrice > 0
+      ? formatUsd(item.currentPrice)
+      : "price needed";
   return [merchantLabel(item.merchant), price, item.promoCode || undefined].filter(Boolean).join(" · ");
 }
 
