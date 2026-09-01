@@ -1,9 +1,8 @@
 import { percentOff, type Deal } from "@/lib/types";
 
 /**
- * Public Amazon prices are not live Amazon-served data until PA-API exists.
- * Cards/detail show "See price at Amazon" instead of a hand-typed number.
- * Staff preview may still show the number the editor just scraped or typed.
+ * Show the listing price on cards and detail.
+ * Amazon TOS still requires the Get Deal click to confirm at Amazon.
  */
 export function publicPriceDisplay(
   deal: Pick<Deal, "merchant" | "currentPrice" | "listPrice">,
@@ -14,14 +13,7 @@ export function publicPriceDisplay(
   percent: number | null;
   asOfLabel: string | null;
 } {
-  if (deal.merchant === "amazon" && !options?.staffPreview) {
-    return {
-      headline: "See price at Amazon",
-      listPrice: null,
-      percent: null,
-      asOfLabel: null,
-    };
-  }
+  void options;
   return {
     headline: "",
     listPrice: deal.listPrice,
