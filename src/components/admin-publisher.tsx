@@ -402,15 +402,11 @@ export function AdminPublisher({
         currentPrice:
           parsed.currentPrice != null
             ? String(parsed.currentPrice)
-            : sameListing
-              ? current.currentPrice
-              : "",
+            : current.currentPrice,
         listPrice:
           parsed.listPrice != null
             ? String(parsed.listPrice)
-            : sameListing
-              ? current.listPrice
-              : "",
+            : current.listPrice,
         scrapedImageUrl:
           parsed.scrapedImageUrl ||
           (resolved.imageTier === "cdn" ? resolved.imageUrl : current.scrapedImageUrl),
@@ -1140,7 +1136,7 @@ export function AdminPublisher({
             </Button>
           </div>
 
-          <div className="max-w-3xl">
+          <div>
             <p className="mb-2 text-xs font-bold tracking-wider text-slate-400 uppercase">Preview</p>
             <DealCard deal={preview} variant="preview" />
           </div>
