@@ -1,8 +1,11 @@
+import { looksClonedWriteup } from "@/lib/stack-copy";
 import type { Deal, StackingStep } from "@/lib/types";
 
 export function originalWhyNote(summary: string | null | undefined): string | null {
   const trimmed = summary?.trim() ?? "";
-  return trimmed.length > 0 ? trimmed : null;
+  if (!trimmed) return null;
+  if (looksClonedWriteup(trimmed)) return null;
+  return trimmed;
 }
 
 export function editorialSections(deal: Pick<Deal, "summary" | "stackingSteps">): {

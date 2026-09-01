@@ -24,6 +24,7 @@ import {
   rewritePastedDeal,
   stackedBullets,
   stackedHeadline,
+  stackedWhyNote,
 } from "@/lib/stack-copy";
 import { boxesToStackingSteps, staffWriteupBoxes, writeupReady } from "@/lib/editorial";
 import { withHttps } from "@/lib/affiliate";
@@ -695,13 +696,22 @@ export function AdminPublisher({
       listPrice: draft.listPrice,
       promoCode: draft.promoCode,
     });
+    const live = priceNumber(rewritten.currentPrice);
+    const list = priceNumber(rewritten.listPrice);
+    const listPrice = list != null && live != null && list > live ? rewritten.listPrice : "";
     setDraft((current) => {
       const next = applyStackToDraft(current, {
         clipCoupon: rewritten.clipCoupon,
         subscribeSave: rewritten.subscribeSave,
         promoCode: rewritten.promoCode,
         currentPrice: rewritten.currentPrice,
-        listPrice: rewritten.listPrice,
+        listPrice,
+        summary: stackedWhyNote({
+          currentPrice: live,
+          clipCoupon: rewritten.clipCoupon,
+          subscribeSave: rewritten.subscribeSave,
+          promoCode: rewritten.promoCode,
+        }),
         stackNote: [
           rewritten.clipCoupon ? "Clip the on-page coupon." : "",
           rewritten.subscribeSave ? "Turn on Subscribe & Save." : "",

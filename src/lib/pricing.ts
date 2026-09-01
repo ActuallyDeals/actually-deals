@@ -16,7 +16,7 @@ export function publicPriceDisplay(
   void options;
   return {
     headline: "",
-    listPrice: deal.listPrice,
+    listPrice: deal.listPrice != null && deal.listPrice > deal.currentPrice ? deal.listPrice : null,
     percent: percentOff(deal),
     asOfLabel: null,
   };

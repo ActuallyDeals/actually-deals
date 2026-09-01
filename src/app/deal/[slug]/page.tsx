@@ -10,6 +10,7 @@ import { VoteWidget } from "@/components/vote-widget";
 import { formatRelativeTime, formatUsd } from "@/lib/format";
 import { merchantLabel } from "@/lib/merchants";
 import { dealHasProductLink } from "@/lib/outbound";
+import { originalWhyNote } from "@/lib/editorial";
 import { publicPriceDisplay } from "@/lib/pricing";
 import { getDealBySlug, getMyVote, listComments } from "@/lib/store";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "@/lib/disclosures";
@@ -28,7 +29,7 @@ export async function generateMetadata({
   if (!deal || deal.status !== "published") return { title: "Deal not found · Actually Deals" };
   return {
     title: `${deal.title} · Actually Deals`,
-    description: deal.summary ?? deal.bullets[0],
+    description: originalWhyNote(deal.summary) ?? deal.bullets[0],
   };
 }
 

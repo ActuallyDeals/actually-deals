@@ -219,14 +219,17 @@ function extractFromHtml(html: string, merchant: Merchant): {
     parseMoney($('[data-testid="price-wrap"] [data-testid="price"]').first().text()) ??
     parseMoney($('[data-test="product-price"]').first().text()) ??
     parseMoney($(".price-format__main-price").first().text()) ??
-    parseMoney($(".priceView-hero-price span").first().text()) ??
-    parseMoney($(".price-detailed__unit-price").first().text());
+    parseMoney($(".priceView-hero-price span").first().text());
 
   listPrice =
     listPrice ??
     parseMoney($(".a-price.a-text-price .a-offscreen").first().text()) ??
     parseMoney($('[data-testid="list-price"]').first().text()) ??
     parseMoney($(".priceView-price-reg").first().text());
+
+  if (listPrice != null && currentPrice != null && listPrice <= currentPrice) {
+    listPrice = null;
+  }
 
   if (merchant === "amazon") {
     title = title?.replace(/\s+Amazon\.com\s*:/i, "").replace(/^Amazon\.com\s*:\s*/i, "") ?? title;
