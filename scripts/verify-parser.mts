@@ -205,9 +205,28 @@ const dup = findDuplicateDeal(
   "4000233859",
 );
 assert.equal(dup?.slug, "live-inkind");
-assert.equal(findDuplicateDeal([dup!], "costco", "4000233859", "live-inkind"), null);
+assert.equal(findDuplicateDeal([dup!], "costco", "4000233859", null, "live-inkind"), null);
 assert.equal(findDuplicateDeal([dup!], "ebay", "4000233859"), null);
 assert.equal(findDuplicateDeal([dup!], "costco", null), null);
+assert.equal(findDuplicateDeal([dup!], "costco", "4000233859", "OTHERCODE")?.slug, "live-inkind");
+
+const codeLive = {
+  slug: "doordash-save10",
+  title: "DoorDash $10 off",
+  merchant: "doordash",
+  merchantProductId: null,
+  promoCode: "SAVE10",
+} as never;
+assert.equal(findDuplicateDeal([codeLive], "doordash", null, "save10")?.slug, "doordash-save10");
+assert.equal(findDuplicateDeal([codeLive], "doordash", null, "  SAVE10  ")?.slug, "doordash-save10");
+assert.equal(findDuplicateDeal([codeLive], "doordash", null, "SAVE10", "doordash-save10"), null);
+assert.equal(findDuplicateDeal([codeLive], "uber", null, "SAVE10"), null);
+assert.equal(findDuplicateDeal([codeLive], "doordash", null, ""), null);
+assert.equal(findDuplicateDeal([codeLive], "doordash", null, "   "), null);
+assert.equal(
+  findDuplicateDeal([{ ...codeLive, promoCode: "" } as never], "doordash", null, "SAVE10"),
+  null,
+);
 
 
 const newegg =

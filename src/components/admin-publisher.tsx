@@ -547,7 +547,13 @@ export function AdminPublisher({
       const duplicate =
         payload.deskDuplicate && payload.deskDuplicate.slug !== editingSlug
           ? payload.deskDuplicate
-          : findDuplicateDeal([...queued, ...live], parsed.merchant, parsed.merchantProductId, editingSlug);
+          : findDuplicateDeal(
+              [...queued, ...live],
+              parsed.merchant,
+              parsed.merchantProductId,
+              draft.promoCode,
+              editingSlug,
+            );
       if (duplicate) {
         const message = deskNotice(duplicate.title);
         setNotice(message);
@@ -738,6 +744,7 @@ export function AdminPublisher({
         [...queued, ...live],
         draft.merchant,
         draft.merchantProductId,
+        draft.promoCode,
         editingSlug,
       );
       if (duplicate) {
