@@ -13,7 +13,7 @@ export function stackTags(clipCoupon: boolean, subscribeSave: boolean, promoCode
 }
 
 export function productNameFromTitle(title: string): string {
-  return title.replace(TITLE_PREFIX, "").replace(/\s+at (?:Amazon|Walmart|Target|Home Depot|Best Buy)$/i, "").trim() || title.trim();
+  return title.replace(TITLE_PREFIX, "").replace(/\s+at (?:Amazon|Walmart|Target|Home Depot|Best Buy|Costco)$/i, "").trim() || title.trim();
 }
 
 export function inferStackFromTitle(title: string): { clipCoupon: boolean; subscribeSave: boolean } {

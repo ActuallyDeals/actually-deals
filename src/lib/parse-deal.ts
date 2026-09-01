@@ -4,6 +4,7 @@ import { isRetailerShortUrl } from "@/lib/outbound";
 import { buildDanBullets, buildStackingSteps, discountPercent } from "@/lib/copy-engine";
 import { parseMoney } from "@/lib/format";
 import { preferProductPhoto, resolveDealImage } from "@/lib/images";
+import { giftCardFaceValue } from "@/lib/pricing";
 import {
   detectMerchant,
   extractMerchantProductId,
@@ -318,6 +319,26 @@ function humanizeSlug(slug: string): string {
     .trim();
 }
 
+function titleCaseProductName(value: string): string {
+  return value
+    .split(" ")
+    .map((word, index) => {
+      if (!word) return word;
+      if (/^e-?gift$/i.test(word)) return "eGift";
+      if (index > 0 && /^(and|or|of|the|at|in|for)$/i.test(word)) return word.toLowerCase();
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+function displaySlugTitle(slug: string): string {
+  const raw = humanizeSlug(slug);
+  if (!raw) return raw;
+  const compact = slug.replace(/[-_+/]/g, "");
+  if (/[A-Z]/.test(compact)) return raw;
+  return titleCaseProductName(raw);
+}
+
 function looksLikeChallengeCopy(value: string | null | undefined): boolean {
   if (!value) return false;
   return /robot or human|are you a robot|access denied|pardon our|just a moment|attention required|px-captcha|blocked/i.test(
@@ -326,7 +347,7 @@ function looksLikeChallengeCopy(value: string | null | undefined): boolean {
 }
 
 /** Best-effort title from the product path when the retailer hides the page. Never a price. */
-function titleFromProductUrl(
+export function titleFromProductUrl(
   url: string,
   merchant: Merchant,
   productId: string | null,
@@ -336,29 +357,38 @@ function titleFromProductUrl(
     if (merchant === "walmart") {
       const ip = parts.indexOf("ip");
       if (ip >= 0 && parts[ip + 1] && parts[ip + 1] !== productId) {
-        return humanizeSlug(parts[ip + 1]);
+        return displaySlugTitle(parts[ip + 1]);
       }
     }
     if (merchant === "target") {
       const p = parts.indexOf("p");
-      if (p >= 0 && parts[p + 1] && parts[p + 1] !== "-") return humanizeSlug(parts[p + 1]);
+      if (p >= 0 && parts[p + 1] && parts[p + 1] !== "-") return displaySlugTitle(parts[p + 1]);
     }
     if (merchant === "home-depot") {
       const p = parts.indexOf("p");
-      if (p >= 0 && parts[p + 1] && !/^\d+$/.test(parts[p + 1])) return humanizeSlug(parts[p + 1]);
+      if (p >= 0 && parts[p + 1] && !/^\d+$/.test(parts[p + 1])) return displaySlugTitle(parts[p + 1]);
     }
     if (merchant === "best-buy") {
       const site = parts.indexOf("site");
       if (site >= 0 && parts[site + 1] && !/\.p$/i.test(parts[site + 1])) {
-        return humanizeSlug(parts[site + 1]);
+        return displaySlugTitle(parts[site + 1]);
+      }
+    }
+    if (merchant === "costco") {
+      for (let i = parts.length - 1; i >= 0; i -= 1) {
+        if (productId && parts[i].replace(/\.(?:html|product).*$/i, "") === productId) continue;
+        if (parts[i] === "p" || parts[i] === "-") continue;
+        if (/^\d+$/.test(parts[i])) continue;
+        const seg = displaySlugTitle(parts[i]);
+        if (seg.length > 3) return seg;
       }
     }
     if (merchant === "amazon") {
       const dp = parts.findIndex((part) => part === "dp" || part === "gp");
-      if (dp > 0) return humanizeSlug(parts[dp - 1]);
+      if (dp > 0) return displaySlugTitle(parts[dp - 1]);
     }
     for (let i = parts.length - 1; i >= 0; i -= 1) {
-      const seg = humanizeSlug(parts[i]);
+      const seg = displaySlugTitle(parts[i]);
       if (!seg || (productId && parts[i].replace(/\.p$/i, "") === productId)) continue;
       if (/^\d+$/.test(seg) || /^[A-Z0-9]{10}$/i.test(parts[i])) continue;
       if (seg.length > 3) return seg;
@@ -379,6 +409,7 @@ function fallbackTitle(merchant: Merchant, productId: string | null, url: string
       target: `Target TCIN ${productId}`,
       "home-depot": `Home Depot SKU ${productId}`,
       "best-buy": `Best Buy SKU ${productId}`,
+      costco: `Costco item ${productId}`,
       other: "Untitled deal",
     };
     return labels[merchant];
@@ -401,6 +432,18 @@ export function canonicalSourceUrl(merchant: Merchant, productId: string | null,
   }
   if (merchant === "best-buy" && productId) {
     return `https://www.bestbuy.com/site/${productId}.p?skuId=${productId}`;
+  }
+  if (merchant === "costco") {
+    try {
+      const parsed = new URL(cleanedUrl);
+      parsed.search = "";
+      parsed.hash = "";
+      if (productId && parsed.pathname.includes(productId)) return parsed.toString();
+      if (productId) return `https://www.costco.com/p/-/${productId}`;
+      return parsed.toString();
+    } catch {
+      return cleanedUrl;
+    }
   }
   return cleanedUrl;
 }
@@ -452,7 +495,11 @@ export async function parseDealUrl(rawUrl: string): Promise<ParsedDeal> {
     titleFromProductUrl(started, merchant, merchantProductId) ||
     fallbackTitle(merchant, merchantProductId, sourceUrl);
   const currentPrice = scrapeBlocked ? null : extracted.currentPrice;
-  const listPrice = scrapeBlocked ? null : extracted.listPrice;
+  const face = giftCardFaceValue(started, workingUrl, sourceUrl, title);
+  let listPrice = scrapeBlocked ? null : extracted.listPrice;
+  if (face != null && (listPrice == null || listPrice < face) && (currentPrice == null || face > currentPrice)) {
+    listPrice = face;
+  }
   const bullets = buildDanBullets({
     merchant,
     currentPrice,

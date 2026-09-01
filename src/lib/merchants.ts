@@ -38,6 +38,12 @@ export const MERCHANT_PROFILES: Record<Merchant, MerchantProfile> = {
     hostMatches: ["bestbuy.", "bbyurl.us"],
     color: "#0046BE",
   },
+  costco: {
+    id: "costco",
+    label: "Costco",
+    hostMatches: ["costco."],
+    color: "#E31837",
+  },
   other: {
     id: "other",
     label: "Store",
@@ -99,6 +105,14 @@ export function extractMerchantProductId(rawUrl: string, merchant: Merchant): st
           path.match(/\/(\d{6,})\.p(?:$|\/)/i)?.[1] ??
           null
         );
+      }
+      case "costco": {
+        const segments = path.split("/").filter(Boolean);
+        for (let i = segments.length - 1; i >= 0; i -= 1) {
+          const seg = segments[i].replace(/\.(?:html|product).*$/i, "");
+          if (/^\d{6,}$/.test(seg)) return seg;
+        }
+        return null;
       }
       default:
         return null;

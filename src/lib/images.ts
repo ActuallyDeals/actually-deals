@@ -4,6 +4,7 @@ import type { Merchant } from "@/lib/types";
 export type ImageTier = "scraped" | "cdn" | "placeholder";
 
 export function brandedPlaceholder(merchant: Merchant): string {
+  if (merchant === "costco") return "/placeholders/other.svg";
   return `/placeholders/${merchant}.svg`;
 }
 

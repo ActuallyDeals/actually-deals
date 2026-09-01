@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { attachAffiliate, cleanTrackingParams, withHttps } from "../src/lib/affiliate.ts";
 import { imageFallbackChain, isBrandedPlaceholder, resolveDealImage } from "../src/lib/images.ts";
+import { findDuplicateDeal } from "../src/lib/desk.ts";
 import { extractRetailerCandidates } from "../src/lib/ingest-roundup.ts";
 import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
+import { canonicalSourceUrl, titleFromProductUrl } from "../src/lib/parse-deal.ts";
+import { giftCardFaceValue } from "../src/lib/pricing.ts";
 import { isCouponOnlyDeal, isDirectRetailerListing } from "../src/lib/outbound.ts";
 import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
 
@@ -108,5 +111,41 @@ process.env.SOCIAL_AUTO_POST = "true";
 assert.equal(socialAutoPostEnabled(), true);
 process.env.SOCIAL_AUTO_POST = "false";
 assert.equal(socialAutoPostEnabled(), false);
+
+const costco =
+  "https://www.costco.com/p/-/inkind-one-egift-card-thousands-of-restaurants-100-value/4000233859?langId=-1";
+assert.equal(detectMerchant(costco), "costco");
+assert.equal(extractMerchantProductId(costco, "costco"), "4000233859");
+assert.equal(isDirectRetailerListing(costco, "costco"), true);
+assert.equal(
+  isCouponOnlyDeal({ promoCode: null, sourceUrl: costco, merchant: "costco" }),
+  false,
+);
+assert.equal(titleFromProductUrl(costco, "costco", "4000233859")?.startsWith("Inkind One eGift Card"), true);
+assert.equal(giftCardFaceValue(costco), 100);
+assert.equal(giftCardFaceValue("Inkind One eGift Card 100 value"), 100);
+assert.equal(giftCardFaceValue("$100 restaurant card"), 100);
+assert.equal(canonicalSourceUrl("costco", "4000233859", costco).includes("langId"), false);
+assert.equal(canonicalSourceUrl("costco", "4000233859", costco).includes("4000233859"), true);
+const costcoImage = resolveDealImage({
+  scrapedImageUrl: null,
+  merchant: "costco",
+  merchantProductId: "4000233859",
+});
+assert.equal(costcoImage.imageTier, "placeholder");
+assert.equal(costcoImage.imageUrl, "/placeholders/other.svg");
+
+const dup = findDuplicateDeal(
+  [
+    {
+      slug: "live-inkind",
+      title: "Inkind One eGift Card",
+      merchantProductId: "4000233859",
+    } as never,
+  ],
+  "4000233859",
+);
+assert.equal(dup?.slug, "live-inkind");
+assert.equal(findDuplicateDeal([dup!], "4000233859", "live-inkind"), null);
 
 console.log("parser verification passed");

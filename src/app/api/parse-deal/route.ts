@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { ingestDealPaste } from "@/lib/ingest-roundup";
 import { ParseDealError } from "@/lib/parse-deal";
+import { findDeskDuplicate } from "@/lib/store";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A product URL is required." }, { status: 400 });
     }
     const parsed = await ingestDealPaste(body.url);
-    return NextResponse.json(parsed);
+    const first = parsed.deals[0];
+    const hit = first?.merchantProductId
+      ? await findDeskDuplicate(first.merchantProductId)
+      : null;
+    const deskDuplicate = hit ? { slug: hit.slug, title: hit.title } : null;
+    return NextResponse.json({ ...parsed, deskDuplicate });
   } catch (error) {
     if (error instanceof ParseDealError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

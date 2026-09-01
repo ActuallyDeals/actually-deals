@@ -13,11 +13,11 @@ export default function PrivacyPage() {
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 sm:px-6">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Privacy</h1>
         <p className="mt-4 text-base leading-relaxed text-slate-600">
-          We may set a cookie so a vote can be changed. Comments keep the name and text you type. We
+          We may set a cookie so you can change a vote. Comments keep the name and text you type. We
           do not sell that.
         </p>
         <p className="mt-4 text-base leading-relaxed text-slate-600">
-          Merchant sites have their own policies. Affiliate networks may count a Get Deal click.
+          Store sites have their own privacy policies.
         </p>
       </main>
       <SiteFooter />

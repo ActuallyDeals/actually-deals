@@ -7,6 +7,7 @@ import { isBrandedPlaceholder, isUsableImageUrl, resolveDealImage } from "@/lib/
 import { upgradeAmazonImageUrl } from "@/lib/merchants";
 import { SEED_COMMENTS, SEED_DEALS, SEED_VOTES } from "@/lib/seed";
 import { createId, uniqueSlug } from "@/lib/slug";
+import { findDuplicateDeal } from "@/lib/desk";
 import { isCouponOnlyDeal } from "@/lib/outbound";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import type {
@@ -430,6 +431,15 @@ export async function listAllDeals(): Promise<Deal[]> {
   return state.deals.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+
+export async function findDeskDuplicate(
+  merchantProductId: string | null | undefined,
+  exceptSlug?: string | null,
+): Promise<Deal | null> {
+  const [queued, published] = await Promise.all([listQueuedDeals(), listPublishedDeals()]);
+  return findDuplicateDeal([...queued, ...published], merchantProductId, exceptSlug);
+}
+
 export async function getDealBySlug(slug: string): Promise<Deal | null> {
   if (isSupabaseConfigured()) {
     await ensureSupabaseSeed();
@@ -496,6 +506,12 @@ export async function publishDeal(input: PublishDealInput): Promise<Deal> {
 
 export async function saveDeal(input: PublishDealInput, previousSlug?: string): Promise<Deal> {
   validateDealInput(input);
+  if ((input.status ?? "published") === "published") {
+    const duplicate = await findDeskDuplicate(input.merchantProductId ?? null, previousSlug);
+    if (duplicate) {
+      throw new Error(`Already on the desk: ${duplicate.title}`);
+    }
+  }
 
   if (isSupabaseConfigured()) {
     await ensureSupabaseSeed();

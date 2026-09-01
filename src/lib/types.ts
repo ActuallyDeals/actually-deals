@@ -4,6 +4,7 @@ export const MERCHANTS = [
   "target",
   "home-depot",
   "best-buy",
+  "costco",
   "other",
 ] as const;
 

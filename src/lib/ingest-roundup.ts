@@ -12,6 +12,7 @@ import {
   parseDealUrl,
   ParseDealError,
 } from "@/lib/parse-deal";
+import { giftCardFaceValue } from "@/lib/pricing";
 import type { Merchant, ParsedDeal } from "@/lib/types";
 
 const UNWRAP_TIMEOUT_MS = 5000;
@@ -207,10 +208,14 @@ function parsedFromCandidate(
     merchantProductId: productId,
   });
   const currentPrice = candidate.currentPrice;
-  const listPrice =
+  const face = giftCardFaceValue(candidate.href, unwrapped, candidate.title);
+  let listPrice =
     candidate.listPrice != null && currentPrice != null && candidate.listPrice > currentPrice
       ? candidate.listPrice
       : null;
+  if (face != null && (listPrice == null || listPrice < face) && (currentPrice == null || face > currentPrice)) {
+    listPrice = face;
+  }
   const bullets = buildDanBullets({
     merchant,
     currentPrice,
@@ -263,7 +268,7 @@ async function ingestThirdPartyPage(rawUrl: string): Promise<IngestResult> {
     return {
       deals: [],
       scrapeNote:
-        "No retailer product links found on that page. Paste an Amazon, Walmart, Target, Home Depot, or Best Buy product URL.",
+        "No retailer product links found on that page. Paste an Amazon, Walmart, Target, Home Depot, Best Buy, or Costco product URL.",
     };
   }
 

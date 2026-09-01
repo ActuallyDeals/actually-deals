@@ -68,6 +68,7 @@ const TRACKING_EXACT = new Set([
   "subid",
   "subid1",
   "subid2",
+  "langid",
 ]);
 
 const TRACKING_PREFIXES = ["utm_", "pf_rd_", "pd_rd_", "mc_", "nr_", "amp;"];

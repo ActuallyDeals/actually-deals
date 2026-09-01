@@ -30,6 +30,8 @@ import { withHttps } from "@/lib/affiliate";
 import { isBrandedPlaceholder, resolveDealImage } from "@/lib/images";
 import { isCouponOnlyDeal } from "@/lib/outbound";
 import { MERCHANT_PROFILES } from "@/lib/merchants";
+import { giftCardFaceValue } from "@/lib/pricing";
+import { findDuplicateDeal } from "@/lib/desk";
 import {
   DEAL_CATEGORIES,
   QUEUE_STAGES,
@@ -105,6 +107,18 @@ const emptyDraft: Draft = {
 function priceNumber(value: string): number | null {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function mergeListPrice(staffWas: string, parsedList: number | null, ...blobs: Array<string | null | undefined>): string {
+  const face = parsedList ?? giftCardFaceValue(...blobs);
+  const staff = priceNumber(staffWas);
+  if (face == null) return staffWas;
+  if (staff != null && staff > face) return staffWas;
+  return String(face);
+}
+
+function deskNotice(title: string): string {
+  return `Already on the desk: ${title}`;
 }
 
 function dealToDraft(deal: Deal): Draft {
@@ -428,10 +442,14 @@ export function AdminPublisher({
           parsed.currentPrice != null
             ? String(parsed.currentPrice)
             : current.currentPrice,
-        listPrice:
-          parsed.listPrice != null
-            ? String(parsed.listPrice)
-            : current.listPrice,
+        listPrice: mergeListPrice(
+          current.listPrice,
+          parsed.listPrice,
+          parsed.sourceUrl,
+          parsed.title,
+          current.sourceUrl,
+          current.title,
+        ),
         scrapedImageUrl:
           parsed.scrapedImageUrl ||
           (resolved.imageTier === "cdn" ? resolved.imageUrl : current.scrapedImageUrl),
@@ -468,6 +486,7 @@ export function AdminPublisher({
         error?: string;
         deals?: ParsedDeal[];
         scrapeNote?: string | null;
+        deskDuplicate?: { slug: string; title: string } | null;
       } & Partial<ParsedDeal>;
       if (!response.ok) throw new Error(payload.error || "Parse failed.");
       const deals =
@@ -491,7 +510,18 @@ export function AdminPublisher({
       parsedUrls.current.add(parsed.sourceUrl);
       setUrl(parsed.sourceUrl);
       applyParsed(parsed);
-      if (parsed.currentPrice == null) {
+      const duplicate =
+        payload.deskDuplicate && payload.deskDuplicate.slug !== editingSlug
+          ? payload.deskDuplicate
+          : findDuplicateDeal([...queued, ...live], parsed.merchantProductId, editingSlug);
+      if (duplicate) {
+        const message = deskNotice(duplicate.title);
+        setNotice(message);
+        toast.message(message);
+        if (parsed.currentPrice == null) {
+          window.setTimeout(() => priceRef.current?.focus(), 0);
+        }
+      } else if (parsed.currentPrice == null) {
         const message =
           parsed.merchant === "amazon"
             ? "Amazon hid the price. Paste the live number."
@@ -668,6 +698,17 @@ export function AdminPublisher({
       return;
     }
     if (status === "published") {
+      const duplicate = findDuplicateDeal(
+        [...queued, ...live],
+        draft.merchantProductId,
+        editingSlug,
+      );
+      if (duplicate) {
+        const message = deskNotice(duplicate.title);
+        setError(message);
+        toast.error(message);
+        return;
+      }
       const coupon = isCouponOnlyDeal({
         promoCode: draft.promoCode,
         sourceUrl: draft.sourceUrl || url,
@@ -878,6 +919,9 @@ export function AdminPublisher({
         pricesBlocked: field === "currentPrice" ? priceNumber(value) == null : current.pricesBlocked,
       });
       const pay = priceNumber(next.currentPrice);
+      if (priceNumber(next.listPrice) == null) {
+        next.listPrice = mergeListPrice(next.listPrice, null, next.sourceUrl, next.title, url);
+      }
       const list = priceNumber(next.listPrice);
       const genericBullet =
         !current.bullets[0] ||
@@ -1067,7 +1111,7 @@ export function AdminPublisher({
               onBlur={() => {
                 if (looksLikeUrl(url) && !parsedUrls.current.has(url.trim())) void runParse(url);
               }}
-              placeholder="Paste Amazon, Walmart, Target, or a deal-page URL"
+              placeholder="Paste Amazon, Walmart, Target, Costco, or a deal-page URL"
               className="h-12 text-base font-medium"
             />
             <div className="flex items-center justify-between gap-3">
