@@ -320,6 +320,7 @@ function toDealFromInput(input: PublishDealInput, existingSlugs: Set<string>, pr
       : (input.queueStage ?? previous?.queueStage ?? "draft");
   const slug = previous?.slug ?? uniqueSlug(input.title, existingSlugs);
   const currentPrice = Number.isFinite(input.currentPrice) ? Number(input.currentPrice) : 0;
+  const livePrice = currentPrice > 0 ? currentPrice : null;
   const writeup = staffWriteupBoxes({
     summary: input.summary ?? null,
     stackingSteps: input.stackingSteps ?? previous?.stackingSteps ?? [],
@@ -355,19 +356,19 @@ function toDealFromInput(input: PublishDealInput, existingSlugs: Set<string>, pr
       }),
     socialPost:
       input.socialPost?.trim() ||
-      (input.summary?.trim() && input.currentPrice != null && input.currentPrice > 0
-        ? serializeSocialDrafts(
-            composeSocialDrafts({
-              title: input.title.trim(),
-              merchant,
-              currentPrice,
-              why: input.summary,
-              stack: writeup.stack,
-              verify: writeup.verify,
-              slug,
-            }),
-          )
-        : (previous?.socialPost ?? null)),
+      serializeSocialDrafts(
+        composeSocialDrafts({
+          title: input.title.trim(),
+          merchant,
+          currentPrice: livePrice,
+          promoCode: input.promoCode?.trim() || null,
+          why: writeup.why,
+          stack: writeup.stack,
+          verify: writeup.verify,
+          slug,
+        }),
+      ) ||
+      null,
     summary: input.summary?.trim() || null,
     status,
     queueStage,
