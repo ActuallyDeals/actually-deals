@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CommentThread } from "@/components/comment-thread";
@@ -7,30 +8,96 @@ import { DealImage } from "@/components/deal-image";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { VoteWidget } from "@/components/vote-widget";
+import { originalWhyNote } from "@/lib/editorial";
 import { formatRelativeTime, formatUsd } from "@/lib/format";
+import { isBrandedPlaceholder, isUsableImageUrl, resolveDealImage } from "@/lib/images";
 import { merchantLabel } from "@/lib/merchants";
 import { dealHasProductLink, isCouponOnlyDeal } from "@/lib/outbound";
-import { originalWhyNote } from "@/lib/editorial";
 import { publicPriceDisplay } from "@/lib/pricing";
 import { getDealBySlug, getMyVote, listComments } from "@/lib/store";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "@/lib/disclosures";
-import { isCommunityExpired } from "@/lib/types";
+import { isCommunityExpired, type Deal } from "@/lib/types";
 import { getVoterKey } from "@/lib/voter";
 
 export const dynamic = "force-dynamic";
+
+function dealPageUrl(slug: string): string {
+  return `https://actuallydeals.com/deal/${slug}`;
+}
+
+function resolvedDealPhoto(
+  deal: Pick<Deal, "scrapedImageUrl" | "imageUrl" | "merchant" | "merchantProductId">,
+): string | null {
+  const { imageUrl } = resolveDealImage({
+    scrapedImageUrl: deal.scrapedImageUrl ?? deal.imageUrl,
+    merchant: deal.merchant,
+    merchantProductId: deal.merchantProductId,
+  });
+  if (isBrandedPlaceholder(imageUrl)) return null;
+  if (!/^https?:\/\//i.test(imageUrl)) return null;
+  if (!isUsableImageUrl(imageUrl)) return null;
+  return imageUrl;
+}
+
+function productJsonLd(deal: Deal, slug: string) {
+  const canonical = dealPageUrl(slug);
+  const image = resolvedDealPhoto(deal);
+  const outbound = deal.affiliateUrl?.trim() || deal.sourceUrl?.trim() || "";
+  const offerUrl = isCouponOnlyDeal(deal) || !outbound ? canonical : outbound;
+
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: deal.title,
+    url: canonical,
+    brand: {
+      "@type": "Brand",
+      name: merchantLabel(deal.merchant),
+    },
+    offers: {
+      "@type": "Offer",
+      url: offerUrl,
+      price: deal.currentPrice,
+      priceCurrency: "USD",
+      availability:
+        deal.status === "expired" ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
+      seller: {
+        "@type": "Organization",
+        name: merchantLabel(deal.merchant),
+      },
+    },
+  };
+  if (image) jsonLd.image = image;
+  return jsonLd;
+}
 
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
-}) {
+}): Promise<Metadata> {
   const { slug } = await params;
   const deal = await getDealBySlug(slug);
   if (!deal || deal.status !== "published") return { title: "Deal not found · Actually Deals" };
-  return {
-    title: `${deal.title} · Actually Deals`,
-    description: originalWhyNote(deal.summary) ?? deal.bullets[0],
+
+  const title = `${deal.title} · Actually Deals`;
+  const description = originalWhyNote(deal.summary) ?? deal.bullets[0];
+  const imageUrl = resolvedDealPhoto(deal);
+  const metadata: Metadata = {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: dealPageUrl(slug),
+    },
   };
+  if (imageUrl) {
+    const images = [{ url: imageUrl, alt: deal.title, width: 1200, height: 1200 }];
+    metadata.openGraph = { ...metadata.openGraph, images };
+    metadata.twitter = { card: "summary_large_image", images };
+  }
+  return metadata;
 }
 
 export default async function DealPage({
@@ -51,6 +118,10 @@ export default async function DealPage({
 
   return (
     <div className="flex min-h-full flex-col bg-slate-100">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(deal, slug)) }}
+      />
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <Link href="/" className="text-sm font-medium text-slate-500 hover:text-slate-900">

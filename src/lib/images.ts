@@ -23,7 +23,8 @@ export function isBrandedPlaceholder(value: string | null | undefined): boolean 
 
 const JUNK_PATH =
   /logo|sprite|pixel|favicon|1x1|grey-pixel|gray-pixel|spinner|placeholder|icon[-_]|\/icons\/|nav-sprite|prime-logo|amazon-logo|smile-logo/i;
-const TINY_AMAZON = /_(?:AC_)?(?:US|UL|UX|UY|SX|SY|SS)(?:2[0-9]|[3-9][0-9]|1[0-4]\d)_/i;
+const TINY_AMAZON =
+  /_(?:AC_)?(?:US|UL|UX|UY|SX|SY|SS|SL|SC)(?:[1-9]|[1-9]\d|1[0-4]\d)_|_SR\d{1,3},\d{1,3}_/i;
 
 export function isJunkImageUrl(value: string): boolean {
   const lower = value.toLowerCase();
