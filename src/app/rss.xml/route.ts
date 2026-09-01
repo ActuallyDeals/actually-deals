@@ -23,7 +23,7 @@ export async function GET() {
     <channel>
       <title>Actually Deals</title>
       <link>${site}</link>
-      <description>Deals that are actually good.</description>
+      <description>Deals that are actually good!</description>
       ${items}
     </channel>
   </rss>`;

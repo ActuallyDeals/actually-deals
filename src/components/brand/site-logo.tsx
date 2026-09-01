@@ -4,16 +4,31 @@ export function LogoMark({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 32 32"
+      fill="none"
       className={cn("shrink-0", className)}
       aria-hidden="true"
     >
       <rect width="32" height="32" rx="8" fill="#0F172A" />
       <path
-        d="M8.4 14.1 15.9 6.6c.5-.5 1.2-.5 1.7 0l7.8 7.8c.5.5.5 1.2 0 1.7l-7.5 7.5c-.5.5-1.2.5-1.7 0l-7.8-7.8c-.5-.5-.5-1.2 0-1.7Z"
-        fill="#F8FAFC"
+        d="M12.25 13.25v-2.6a2.25 2.25 0 0 1 4.5 0"
+        stroke="#34D399"
+        strokeWidth="1.85"
+        strokeLinecap="round"
       />
-      <circle cx="20.3" cy="11.5" r="1.55" fill="#0F172A" />
-      <rect x="8" y="24.2" width="16" height="2.6" rx="1.3" fill="#059669" />
+      <path
+        d="M15.25 13.25v-2.6a2.25 2.25 0 0 1 4.5 0"
+        stroke="#34D399"
+        strokeWidth="1.85"
+        strokeLinecap="round"
+      />
+      <rect x="8.5" y="12.75" width="15" height="13.5" rx="2.25" fill="#059669" />
+      <path
+        d="M12.4 19.85 14.95 22.4 20.05 16.55"
+        stroke="#ECFDF5"
+        strokeWidth="2.15"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

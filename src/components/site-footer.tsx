@@ -23,9 +23,6 @@ export function SiteFooter() {
             <a href="/rss.xml" className="hover:text-slate-900">
               RSS
             </a>
-            <Link href="/admin" className="text-slate-400 hover:text-slate-600">
-              Staff
-            </Link>
           </div>
         </div>
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">

@@ -16,37 +16,31 @@ export default function AppleIcon() {
           justifyContent: "center",
         }}
       >
-        <div
-          style={{
-            width: 86,
-            height: 86,
-            background: "#F8FAFC",
-            transform: "rotate(45deg)",
-            borderRadius: 10,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            width: 18,
-            height: 18,
-            borderRadius: 18,
-            background: "#0F172A",
-            top: 46,
-            right: 50,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: 28,
-            left: 42,
-            width: 96,
-            height: 12,
-            borderRadius: 8,
-            background: "#059669",
-          }}
-        />
+        <svg width="140" height="140" viewBox="0 0 32 32">
+          <path
+            d="M12.25 13.25v-2.6a2.25 2.25 0 0 1 4.5 0"
+            stroke="#34D399"
+            strokeWidth="1.85"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <path
+            d="M15.25 13.25v-2.6a2.25 2.25 0 0 1 4.5 0"
+            stroke="#34D399"
+            strokeWidth="1.85"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <rect x="8.5" y="12.75" width="15" height="13.5" rx="2.25" fill="#059669" />
+          <path
+            d="M12.4 19.85 14.95 22.4 20.05 16.55"
+            stroke="#ECFDF5"
+            strokeWidth="2.15"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </svg>
       </div>
     ),
     size,

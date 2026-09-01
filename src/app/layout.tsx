@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s · Actually Deals",
   },
   description:
-    "Deals that are actually good.",
+    "Deals that are actually good!",
   icons: {
     icon: "/icon.svg",
     apple: "/apple-icon",
