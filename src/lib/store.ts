@@ -389,6 +389,17 @@ export async function listPublishedDeals(): Promise<Deal[]> {
     .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
 }
 
+export function isPublicDeal(deal: Deal): boolean {
+  if (SEED_DEALS.some((seed) => seed.id === deal.id || seed.slug === deal.slug)) return false;
+  if (isBrandedPlaceholder(deal.imageUrl)) return false;
+  return true;
+}
+
+export async function listPublicDeals(): Promise<Deal[]> {
+  const deals = await listPublishedDeals();
+  return deals.filter(isPublicDeal);
+}
+
 export async function listQueuedDeals(): Promise<Deal[]> {
   const deals = await listAllDeals();
   return deals

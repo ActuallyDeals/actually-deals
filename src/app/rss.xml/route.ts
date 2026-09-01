@@ -1,10 +1,10 @@
-import { listPublishedDeals } from "@/lib/store";
+import { listPublicDeals } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const site = process.env.NEXT_PUBLIC_SITE_URL || "https://actuallydeals.com";
-  const deals = await listPublishedDeals();
+  const deals = await listPublicDeals();
   const items = deals
     .slice(0, 30)
     .map((deal) => {

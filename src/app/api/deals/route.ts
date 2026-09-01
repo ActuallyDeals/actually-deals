@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
-import { listPublishedDeals, listQueuedDeals, saveDeal } from "@/lib/store";
+import { listPublicDeals, listQueuedDeals, saveDeal } from "@/lib/store";
 import { MERCHANTS, type PublishDealInput } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
       const deals = await listQueuedDeals();
       return NextResponse.json({ deals });
     }
-    const deals = await listPublishedDeals();
+    const deals = await listPublicDeals();
     return NextResponse.json({ deals });
   } catch (error) {
     return NextResponse.json(

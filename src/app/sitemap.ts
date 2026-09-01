@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
-import { listPublishedDeals } from "@/lib/store";
+import { listPublicDeals } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = process.env.NEXT_PUBLIC_SITE_URL || "https://actuallydeals.com";
-  const deals = await listPublishedDeals();
+  const deals = await listPublicDeals();
   return [
     { url: site, lastModified: new Date() },
     { url: `${site}/disclosure`, lastModified: new Date() },

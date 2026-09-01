@@ -1,7 +1,7 @@
 import { DealFeed } from "@/components/deal-feed";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { listPublishedDeals } from "@/lib/store";
+import { listPublicDeals } from "@/lib/store";
 import { FEED_FILTERS, type FeedFilter } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export default async function HomePage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = await searchParams;
-  const deals = await listPublishedDeals();
+  const deals = await listPublicDeals();
 
   return (
     <div className="flex min-h-full flex-col bg-slate-100">
