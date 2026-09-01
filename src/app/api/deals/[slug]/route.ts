@@ -54,10 +54,10 @@ export async function PATCH(
     const deal = await saveDeal(body, slug);
     revalidatePath("/");
     revalidatePath("/admin");
-    if (deal.status === "published") revalidatePath(`/deal/${deal.slug}`);
+    if (deal.status === "published" || deal.status === "expired") revalidatePath(`/deal/${deal.slug}`);
     let socialError: string | undefined;
     let socialPosted: string[] | undefined;
-    if (deal.status === "published" && existing?.status !== "published") {
+    if (deal.status === "published" && existing?.status === "draft") {
       const social = await autoPostSocial(deal);
       socialPosted = social.posted;
       socialError = social.error ?? undefined;

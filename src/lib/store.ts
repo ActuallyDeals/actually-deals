@@ -162,7 +162,7 @@ function mapDealRow(row: Record<string, unknown>, extras?: { alive?: number; exp
     summary: (row.summary as string | null) ?? null,
     status: row.status as Deal["status"],
     queueStage:
-      (row.status as Deal["status"]) === "published"
+      (row.status as Deal["status"]) === "published" || (row.status as Deal["status"]) === "expired"
         ? null
         : ((row.queue_stage as QueueStage | null) ?? "draft"),
     publishedAt: (row.published_at as string | null) ?? null,
@@ -313,7 +313,9 @@ function toDealFromInput(input: PublishDealInput, existingSlugs: Set<string>, pr
   });
   const status = input.status ?? "published";
   const queueStage: QueueStage | null =
-    status === "published" ? null : (input.queueStage ?? previous?.queueStage ?? "draft");
+    status === "published" || status === "expired"
+      ? null
+      : (input.queueStage ?? previous?.queueStage ?? "draft");
   const slug = previous?.slug ?? uniqueSlug(input.title, existingSlugs);
   const currentPrice = Number.isFinite(input.currentPrice) ? Number(input.currentPrice) : 0;
   const writeup = staffWriteupBoxes({

@@ -174,6 +174,31 @@ function draftToDeal(draft: Draft): Deal {
   };
 }
 
+function payloadFromDeal(deal: Deal, status: Deal["status"]): PublishDealInput {
+  return {
+    title: deal.title,
+    merchant: deal.merchant,
+    merchantProductId: deal.merchantProductId,
+    sourceUrl: deal.sourceUrl,
+    affiliateUrl: deal.affiliateUrl,
+    scrapedImageUrl: deal.scrapedImageUrl,
+    imageUrl: deal.imageUrl,
+    currentPrice: deal.currentPrice,
+    listPrice: deal.listPrice,
+    promoCode: deal.promoCode,
+    isPriceMistake: deal.isPriceMistake,
+    isStackingHack: deal.isStackingHack,
+    isFeatured: deal.isFeatured,
+    category: deal.category,
+    bullets: deal.bullets,
+    stackingSteps: deal.stackingSteps,
+    socialPost: deal.socialPost,
+    summary: deal.summary,
+    status,
+    queueStage: null,
+  };
+}
+
 function looksLikeUrl(value: string): boolean {
   const candidate = withHttps(value);
   if (!candidate) return false;
@@ -724,6 +749,30 @@ export function AdminPublisher({
     }
   }
 
+  async function setLiveStatus(deal: Deal) {
+    const nextStatus: Deal["status"] = deal.status === "expired" ? "published" : "expired";
+    const label = `live:${deal.slug}`;
+    setSaving(label);
+    setError(null);
+    try {
+      const response = await fetch(`/api/deals/${deal.slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payloadFromDeal(deal, nextStatus)),
+      });
+      const payload = (await response.json()) as { error?: string; deal?: Deal };
+      if (!response.ok || !payload.deal) throw new Error(payload.error || "Save failed.");
+      toast.success(nextStatus === "expired" ? "Marked Dead" : "Revived");
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Save failed.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSaving(null);
+    }
+  }
+
   function loadQueued(deal: Deal) {
     parsedUrls.current.add(deal.sourceUrl);
     setUrl(deal.sourceUrl);
@@ -941,12 +990,14 @@ export function AdminPublisher({
             ) : (
               live.map((item) => {
                 const dead = isDeadListing(item);
+                const staffDead = item.status === "expired";
+                const toggling = saving === `live:${item.slug}`;
                 return (
-                  <li key={item.id}>
+                  <li key={item.id} className="flex items-start gap-1">
                     <button
                       type="button"
                       onClick={() => loadQueued(item)}
-                      className={`w-full rounded-lg px-2 py-1.5 text-left ${
+                      className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left ${
                         editingSlug === item.slug ? "bg-emerald-50" : dead ? "bg-slate-100" : "hover:bg-slate-50"
                       }`}
                     >
@@ -956,6 +1007,14 @@ export function AdminPublisher({
                       <span className={`line-clamp-2 text-xs font-semibold ${dead ? "text-slate-500" : "text-slate-900"}`}>
                         {item.title}
                       </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(saving)}
+                      onClick={() => void setLiveStatus(item)}
+                      className="shrink-0 self-center rounded-md px-1.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50"
+                    >
+                      {toggling ? "…" : staffDead ? "Revive" : "Mark Dead"}
                     </button>
                   </li>
                 );
