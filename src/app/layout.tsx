@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     site: SOCIAL.x.handle,
   },
   other: {
-    "impact-site-verification": "b65b4c60-07b9-466f-b7bb-5b434e030171",
+    "impact-site-verification": "395465db-ea87-47f4-b448-96d4da2b11cf",
   },
 };
 
