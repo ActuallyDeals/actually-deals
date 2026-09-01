@@ -354,9 +354,12 @@ export function AdminPublisher({
   const [fbDraftLocked, setFbDraftLocked] = useState(false);
   const parsedUrls = useRef(new Set<string>());
   const urlRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
   const whyRef = useRef<HTMLTextAreaElement>(null);
   const priceRef = useRef<HTMLInputElement>(null);
+  const listPriceRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
+  const lastAutoTitle = useRef("");
 
   const preview = useMemo(() => draftToDeal(draft), [draft]);
   const placeholderPhoto = isBrandedPlaceholder(draft.imageUrl);
@@ -432,24 +435,43 @@ export function AdminPublisher({
       const imageUrl = isBrandedPlaceholder(parsed.imageUrl)
         ? resolved.imageUrl
         : parsed.imageUrl || resolved.imageUrl;
+      const titleFocused = document.activeElement === titleRef.current;
+      const priceFocused = document.activeElement === priceRef.current;
+      const listFocused =
+        Boolean(listPriceRef.current) && document.activeElement === listPriceRef.current;
+      let title = current.title;
+      if (titleFocused && current.title) {
+        title = current.title;
+      } else if (!sameListing) {
+        title = parsed.title || current.title;
+        lastAutoTitle.current = title;
+      } else if (current.title && current.title !== lastAutoTitle.current) {
+        title = current.title;
+      } else {
+        title = parsed.title;
+        lastAutoTitle.current = parsed.title;
+      }
       const next: Draft = {
         ...current,
         sourceUrl: parsed.sourceUrl,
-        title: parsed.title || current.title,
+        title,
         merchant: parsed.merchant,
         merchantProductId: parsed.merchantProductId ?? current.merchantProductId,
-        currentPrice:
-          parsed.currentPrice != null
+        currentPrice: priceFocused
+          ? current.currentPrice
+          : parsed.currentPrice != null
             ? String(parsed.currentPrice)
             : current.currentPrice,
-        listPrice: mergeListPrice(
-          current.listPrice,
-          parsed.listPrice,
-          parsed.sourceUrl,
-          parsed.title,
-          current.sourceUrl,
-          current.title,
-        ),
+        listPrice: listFocused
+          ? current.listPrice
+          : mergeListPrice(
+              current.listPrice,
+              parsed.listPrice,
+              parsed.sourceUrl,
+              parsed.title,
+              current.sourceUrl,
+              current.title,
+            ),
         scrapedImageUrl:
           parsed.scrapedImageUrl ||
           (resolved.imageTier === "cdn" ? resolved.imageUrl : current.scrapedImageUrl),
@@ -819,6 +841,7 @@ export function AdminPublisher({
   }
 
   function loadQueued(deal: Deal) {
+    lastAutoTitle.current = "";
     parsedUrls.current.add(deal.sourceUrl);
     setUrl(deal.sourceUrl);
     setDraft(dealToDraft(deal));
@@ -842,6 +865,7 @@ export function AdminPublisher({
   }
 
   function startNew() {
+    lastAutoTitle.current = "";
     parsedUrls.current = new Set();
     setUrl("");
     setDraft(emptyDraft);
@@ -1144,6 +1168,7 @@ export function AdminPublisher({
             <Label htmlFor="title">Title</Label>
             <Input
               id="title"
+              ref={titleRef}
               value={draft.title}
               onChange={(event) => setDraft({ ...draft, title: event.target.value })}
               placeholder="Fills from the listing"
@@ -1184,18 +1209,18 @@ export function AdminPublisher({
                   placeholder="The code is the CTA"
                 />
               </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="list-price">Was / list price</Label>
-                <Input
-                  id="list-price"
-                  inputMode="decimal"
-                  value={draft.listPrice}
-                  onChange={(event) => applyStaffPrice("listPrice", event.target.value)}
-                  placeholder="e.g. 29.99"
-                />
-              </div>
-            )}
+            ) : null}
+            <div className={couponOnly ? "hidden" : "space-y-2"}>
+              <Label htmlFor="list-price">Was / list price</Label>
+              <Input
+                id="list-price"
+                ref={listPriceRef}
+                inputMode="decimal"
+                value={draft.listPrice}
+                onChange={(event) => applyStaffPrice("listPrice", event.target.value)}
+                placeholder="e.g. 29.99"
+              />
+            </div>
           </div>
 
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
