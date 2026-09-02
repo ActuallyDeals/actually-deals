@@ -146,6 +146,27 @@ const tagged = attachAffiliate("https://www.amazon.com/dp/B08PQ2KWHS?tag=old-20&
 assert.equal(tagged.includes("tag=actuallydea07-20"), true);
 assert.equal(tagged.includes("th=1"), false);
 
+const prevWalmartId = process.env.AFFILIATE_WALMART_ID;
+const prevWalmartUrl = process.env.NEXT_PUBLIC_WALMART_AFFILIATE_URL;
+delete process.env.AFFILIATE_WALMART_ID;
+delete process.env.NEXT_PUBLIC_WALMART_AFFILIATE_URL;
+const walmartUnwrapped = attachAffiliate(walmart, "walmart");
+assert.equal(walmartUnwrapped.includes("goto.walmart.com"), false);
+assert.equal(walmartUnwrapped.includes("athcpid"), false);
+assert.equal(walmartUnwrapped.includes("utm_campaign"), false);
+assert.equal(walmartUnwrapped.startsWith("https://www.walmart.com/ip/"), true);
+process.env.AFFILIATE_WALMART_ID = "test-walmart-id";
+const walmartWrapped = attachAffiliate(walmart, "walmart");
+const walmartWrapUrl = new URL(walmartWrapped);
+assert.equal(walmartWrapUrl.hostname, "goto.walmart.com");
+assert.equal(walmartWrapUrl.pathname, "/c/test-walmart-id");
+assert.equal(walmartWrapUrl.searchParams.get("u")?.startsWith("https://www.walmart.com/ip/"), true);
+assert.equal(walmartWrapUrl.searchParams.get("u")?.includes("athcpid"), false);
+if (prevWalmartId === undefined) delete process.env.AFFILIATE_WALMART_ID;
+else process.env.AFFILIATE_WALMART_ID = prevWalmartId;
+if (prevWalmartUrl === undefined) delete process.env.NEXT_PUBLIC_WALMART_AFFILIATE_URL;
+else process.env.NEXT_PUBLIC_WALMART_AFFILIATE_URL = prevWalmartUrl;
+
 const image = resolveDealImage({
   scrapedImageUrl: null,
   merchant: "amazon",
@@ -340,8 +361,25 @@ assert.equal(
 assert.equal(extractMerchantProductId("https://www.newegg.com/p/pl?d=ssd", "newegg"), null);
 assert.equal(titleFromProductUrl(newegg, "newegg", "N82E16819113877"), "Amd Ryzen 7 9800x3d");
 assert.equal(canonicalSourceUrl("newegg", "N82E16819113877", newegg), "https://www.newegg.com/p/N82E16819113877");
+const prevNeweggMid = process.env.AFFILIATE_NEWEGG_MID;
+const prevRakutenSid = process.env.AFFILIATE_RAKUTEN_SID;
+delete process.env.AFFILIATE_NEWEGG_MID;
 assert.equal(attachAffiliate(newegg, "newegg").includes("goto."), false);
+assert.equal(attachAffiliate(newegg, "newegg").includes("linksynergy"), false);
 assert.equal(attachAffiliate(newegg, "newegg").includes("cm_mmc"), false);
+process.env.AFFILIATE_RAKUTEN_SID = "4745711";
+process.env.AFFILIATE_NEWEGG_MID = "9999";
+const neweggWrapped = new URL(attachAffiliate(newegg, "newegg"));
+assert.equal(neweggWrapped.hostname, "click.linksynergy.com");
+assert.equal(neweggWrapped.pathname, "/deeplink");
+assert.equal(neweggWrapped.searchParams.get("id"), "4745711");
+assert.equal(neweggWrapped.searchParams.get("mid"), "9999");
+assert.equal(neweggWrapped.searchParams.get("murl")?.includes("newegg.com"), true);
+assert.equal(neweggWrapped.searchParams.get("murl")?.includes("cm_mmc"), false);
+if (prevNeweggMid === undefined) delete process.env.AFFILIATE_NEWEGG_MID;
+else process.env.AFFILIATE_NEWEGG_MID = prevNeweggMid;
+if (prevRakutenSid === undefined) delete process.env.AFFILIATE_RAKUTEN_SID;
+else process.env.AFFILIATE_RAKUTEN_SID = prevRakutenSid;
 
 const ebay = "https://www.ebay.com/itm/sony-wh-1000xm5/256890123456?hash=item&utm_source=x";
 assert.equal(detectMerchant(ebay), "ebay");
@@ -353,6 +391,20 @@ assert.equal(titleFromProductUrl(ebay, "ebay", "256890123456"), "Sony Wh 1000xm5
 assert.equal(canonicalSourceUrl("ebay", "256890123456", ebay), "https://www.ebay.com/itm/256890123456");
 assert.equal(isRetailerShortUrl("https://ebay.us/m/abc"), true);
 assert.equal(isRetailerShortUrl("https://ebay.to/xyz"), true);
+const prevEbayCamp = process.env.AFFILIATE_EBAY_CAMPAIGN_ID;
+delete process.env.AFFILIATE_EBAY_CAMPAIGN_ID;
+assert.equal(attachAffiliate(ebay, "ebay").includes("campid="), false);
+assert.equal(attachAffiliate(ebay, "ebay").includes("utm_source"), false);
+process.env.AFFILIATE_EBAY_CAMPAIGN_ID = "5338000000";
+const ebayWrapped = new URL(attachAffiliate(ebay, "ebay"));
+assert.equal(ebayWrapped.hostname, "www.ebay.com");
+assert.equal(ebayWrapped.searchParams.get("mkcid"), "1");
+assert.equal(ebayWrapped.searchParams.get("mkrid"), "711-53200-19255-0");
+assert.equal(ebayWrapped.searchParams.get("campid"), "5338000000");
+assert.equal(ebayWrapped.searchParams.get("toolid"), "10001");
+assert.equal(ebayWrapped.searchParams.get("mkevt"), "1");
+if (prevEbayCamp === undefined) delete process.env.AFFILIATE_EBAY_CAMPAIGN_ID;
+else process.env.AFFILIATE_EBAY_CAMPAIGN_ID = prevEbayCamp;
 
 const kohls = "https://www.kohls.com/product/prd-3949587/nike-air-max-90-shoes.jsp?utm_campaign=x";
 assert.equal(detectMerchant(kohls), "kohls");
@@ -367,6 +419,17 @@ assert.equal(
   canonicalSourceUrl("kohls", "3949587", "https://www.kohls.com/catalog.jsp?prd=3949587"),
   "https://www.kohls.com/product/prd-3949587/",
 );
+const prevKohlsId = process.env.AFFILIATE_KOHLS_ID;
+delete process.env.AFFILIATE_KOHLS_ID;
+assert.equal(attachAffiliate(kohls, "kohls").includes("sjv.io"), false);
+assert.equal(attachAffiliate(kohls, "kohls").includes("utm_campaign"), false);
+process.env.AFFILIATE_KOHLS_ID = "test-kohls-id";
+const kohlsWrapped = new URL(attachAffiliate(kohls, "kohls"));
+assert.equal(kohlsWrapped.hostname, "kohls.sjv.io");
+assert.equal(kohlsWrapped.pathname, "/c/test-kohls-id");
+assert.equal(kohlsWrapped.searchParams.get("u")?.includes("kohls.com/product"), true);
+if (prevKohlsId === undefined) delete process.env.AFFILIATE_KOHLS_ID;
+else process.env.AFFILIATE_KOHLS_ID = prevKohlsId;
 
 const dicks = "https://www.dickssportinggoods.com/p/yeti-rambler-20-oz/21218426?utm_source=x";
 assert.equal(detectMerchant(dicks), "dicks");
@@ -380,6 +443,15 @@ assert.equal(
   canonicalSourceUrl("dicks", "21218426", dicks),
   "https://www.dickssportinggoods.com/p/yeti-rambler-20-oz/21218426",
 );
+process.env.AFFILIATE_CJ_PID = "8059705";
+process.env.AFFILIATE_CJ_DICKS_AID = "7345657";
+const dicksClean = cleanTrackingParams(dicks);
+const dicksWrapped = new URL(attachAffiliate(dicks, "dicks"));
+assert.equal(dicksWrapped.hostname, "www.anrdoezrs.net");
+assert.equal(dicksWrapped.pathname, "/click-8059705-7345657");
+assert.equal(dicksWrapped.searchParams.get("url"), dicksClean);
+assert.equal(dicksWrapped.searchParams.get("url")?.includes("utm_source"), false);
+assert.equal([...dicksWrapped.searchParams.keys()].join(","), "url");
 
 const office =
   "https://www.officedepot.com/a/products/1234567/HP-Black-Ink/?cm_mmc=track";
@@ -391,6 +463,21 @@ assert.equal(
   canonicalSourceUrl("office-depot", "1234567", office),
   "https://www.officedepot.com/a/products/1234567/",
 );
+const prevOfficeAid = process.env.AFFILIATE_CJ_OFFICE_DEPOT_AID;
+delete process.env.AFFILIATE_CJ_OFFICE_DEPOT_AID;
+assert.equal(attachAffiliate(office, "office-depot").includes("anrdoezrs.net"), false);
+assert.equal(attachAffiliate(office, "office-depot").includes("cm_mmc"), false);
+process.env.AFFILIATE_CJ_PID = "8059705";
+process.env.AFFILIATE_CJ_OFFICE_DEPOT_AID = "1112223";
+const officeWrapped = new URL(attachAffiliate(office, "office-depot"));
+assert.equal(officeWrapped.hostname, "www.anrdoezrs.net");
+assert.equal(officeWrapped.pathname, "/click-8059705-1112223");
+assert.equal(officeWrapped.searchParams.get("url")?.includes("officedepot.com"), true);
+assert.equal(officeWrapped.searchParams.get("url")?.includes("cm_mmc"), false);
+assert.equal([...officeWrapped.searchParams.keys()].join(","), "url");
+if (prevOfficeAid === undefined) delete process.env.AFFILIATE_CJ_OFFICE_DEPOT_AID;
+else process.env.AFFILIATE_CJ_OFFICE_DEPOT_AID = prevOfficeAid;
+assert.equal(attachAffiliate("https://www.costco.com/p/-/foo/4000233859", "costco").includes("goto."), false);
 
 for (const merchant of ["newegg", "ebay", "kohls", "dicks", "office-depot", "uber", "doordash", "grubhub"] as const) {
   const image = resolveDealImage({ scrapedImageUrl: null, merchant, merchantProductId: "x" });

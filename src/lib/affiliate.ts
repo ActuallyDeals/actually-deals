@@ -69,6 +69,12 @@ const TRACKING_EXACT = new Set([
   "subid1",
   "subid2",
   "langid",
+  "mkcid",
+  "mkrid",
+  "campid",
+  "toolid",
+  "mkevt",
+  "customid",
 ]);
 
 const TRACKING_PREFIXES = ["utm_", "pf_rd_", "pd_rd_", "mc_", "nr_", "amp;"];
@@ -114,6 +120,40 @@ function envValue(...keys: string[]): string {
 /** Live Amazon Associates tracking tag / Store ID. `actuallydeals-20` is not available. */
 export const AMAZON_ASSOCIATE_TAG = "actuallydea07-20";
 
+/** Known CJ publisher website ID from our account. Prefer AFFILIATE_CJ_PID. */
+export const CJ_PUBLISHER_PID = "8059705";
+
+/**
+ * Dick's Sporting Goods CJ advertiser ID from the advertiser page.
+ * Relationship is not joined yet — wrap is still emitted so it works after they join.
+ * Prefer AFFILIATE_CJ_DICKS_AID.
+ */
+export const CJ_DICKS_ADVERTISER_ID = "7345657";
+
+/** Remembered Rakuten Advertising / Linkshare SID. Prefer AFFILIATE_RAKUTEN_SID. */
+export const RAKUTEN_SID = "4745711";
+
+/**
+ * CJ deep-link form used here (query shape only; no network call):
+ * https://www.anrdoezrs.net/click-{PID}-{AID}?url={ENCODED_DEST}
+ * AID is the CJ advertiser ID for the merchant.
+ */
+function cjDeepLink(pid: string, aid: string, dest: string): string {
+  return `https://www.anrdoezrs.net/click-${encodeURIComponent(pid)}-${encodeURIComponent(aid)}?url=${encodeURIComponent(dest)}`;
+}
+
+function impactDeepLink(host: string, partnerId: string, dest: string): string {
+  return `https://${host}/c/${encodeURIComponent(partnerId)}?u=${encodeURIComponent(dest)}`;
+}
+
+function rakutenDeepLink(sid: string, mid: string, dest: string): string {
+  const wrap = new URL("https://click.linksynergy.com/deeplink");
+  wrap.searchParams.set("id", sid);
+  wrap.searchParams.set("mid", mid);
+  wrap.searchParams.set("murl", dest);
+  return wrap.toString();
+}
+
 export function affiliateTags() {
   return {
     amazon:
@@ -122,6 +162,13 @@ export function affiliateTags() {
     target: envValue("AFFILIATE_TARGET_ID", "NEXT_PUBLIC_TARGET_AFFILIATE_URL"),
     "home-depot": envValue("AFFILIATE_HOMEDEPOT_ID", "NEXT_PUBLIC_HOME_DEPOT_AFFILIATE_URL"),
     "best-buy": envValue("AFFILIATE_BESTBUY_ID", "NEXT_PUBLIC_BEST_BUY_AFFILIATE_URL"),
+    kohls: envValue("AFFILIATE_KOHLS_ID"),
+    cjPid: envValue("AFFILIATE_CJ_PID") || CJ_PUBLISHER_PID,
+    dicksAid: envValue("AFFILIATE_CJ_DICKS_AID") || CJ_DICKS_ADVERTISER_ID,
+    officeDepotAid: envValue("AFFILIATE_CJ_OFFICE_DEPOT_AID"),
+    ebayCampaignId: envValue("AFFILIATE_EBAY_CAMPAIGN_ID"),
+    rakutenSid: envValue("AFFILIATE_RAKUTEN_SID") || RAKUTEN_SID,
+    neweggMid: envValue("AFFILIATE_NEWEGG_MID"),
   };
 }
 
@@ -134,33 +181,45 @@ export function attachAffiliate(
 
   try {
     const url = new URL(cleaned);
+    const dest = url.toString();
 
     switch (merchant) {
       case "amazon":
         if (tags.amazon) url.searchParams.set("tag", tags.amazon);
         return url.toString();
       case "walmart":
-        if (tags.walmart) {
-          return `https://goto.walmart.com/c/${encodeURIComponent(tags.walmart)}?u=${encodeURIComponent(url.toString())}`;
-        }
-        return url.toString();
+        return tags.walmart ? impactDeepLink("goto.walmart.com", tags.walmart, dest) : dest;
       case "target":
-        if (tags.target) {
-          return `https://goto.target.com/c/${encodeURIComponent(tags.target)}?u=${encodeURIComponent(url.toString())}`;
-        }
-        return url.toString();
+        return tags.target ? impactDeepLink("goto.target.com", tags.target, dest) : dest;
       case "home-depot":
-        if (tags["home-depot"]) {
-          return `https://homedepot.sjv.io/c/${encodeURIComponent(tags["home-depot"])}?u=${encodeURIComponent(url.toString())}`;
-        }
-        return url.toString();
+        return tags["home-depot"]
+          ? impactDeepLink("homedepot.sjv.io", tags["home-depot"], dest)
+          : dest;
       case "best-buy":
-        if (tags["best-buy"]) {
-          return `https://bestbuy.7tiv.net/c/${encodeURIComponent(tags["best-buy"])}?u=${encodeURIComponent(url.toString())}`;
-        }
+        return tags["best-buy"] ? impactDeepLink("bestbuy.7tiv.net", tags["best-buy"], dest) : dest;
+      case "kohls":
+        return tags.kohls ? impactDeepLink("kohls.sjv.io", tags.kohls, dest) : dest;
+      case "dicks":
+        return tags.cjPid && tags.dicksAid ? cjDeepLink(tags.cjPid, tags.dicksAid, dest) : dest;
+      case "office-depot":
+        return tags.cjPid && tags.officeDepotAid
+          ? cjDeepLink(tags.cjPid, tags.officeDepotAid, dest)
+          : dest;
+      case "ebay": {
+        if (!tags.ebayCampaignId) return dest;
+        url.searchParams.set("mkcid", "1");
+        url.searchParams.set("mkrid", "711-53200-19255-0");
+        url.searchParams.set("campid", tags.ebayCampaignId);
+        url.searchParams.set("toolid", "10001");
+        url.searchParams.set("mkevt", "1");
         return url.toString();
+      }
+      case "newegg":
+        return tags.rakutenSid && tags.neweggMid
+          ? rakutenDeepLink(tags.rakutenSid, tags.neweggMid, dest)
+          : dest;
       default:
-        return url.toString();
+        return dest;
     }
   } catch {
     return cleaned;
