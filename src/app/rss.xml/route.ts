@@ -1,3 +1,4 @@
+import { publicBullets } from "@/lib/stack-copy";
 import { listPublicDeals } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function GET() {
         <link>${site}/deal/${deal.slug}</link>
         <guid>${site}/deal/${deal.slug}</guid>
         <pubDate>${new Date(deal.publishedAt ?? deal.createdAt).toUTCString()}</pubDate>
-        <description><![CDATA[${deal.bullets.join(" ")}]]></description>
+        <description><![CDATA[${publicBullets(deal).join(" ")}]]></description>
         ${enclosure}
       </item>`;
     })

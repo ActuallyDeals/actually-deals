@@ -2,7 +2,7 @@ import { buildDanBullets } from "@/lib/copy-engine";
 import { formatUsd } from "@/lib/format";
 import { merchantLabel } from "@/lib/merchants";
 import { isAppCouponMerchant } from "@/lib/outbound";
-import type { Merchant } from "@/lib/types";
+import type { Merchant, StackingStep } from "@/lib/types";
 
 const TITLE_PREFIX = /^(?:\[[^\]]+\]\s*)?\$[\d,.]+?\*?\s*\|\s*/i;
 
@@ -25,6 +25,55 @@ export function inferStackFromTitle(title: string): { clipCoupon: boolean; subsc
     clipCoupon: /\bac\b|coupon/.test(blob),
     subscribeSave: /\bsns\b|s&s|subscribe/.test(blob),
   };
+}
+
+const GENERIC_STACK_COPY =
+  /clip[\s\S]{0,48}coupon|coupon[\s\S]{0,24}clip|subscribe\s*(?:&|and)?\s*save|\bsns\b|\bs&s\b/i;
+
+export function dealHasCouponStack(deal: { title: string; promoCode?: string | null }): boolean {
+  if (deal.promoCode?.trim()) return true;
+  const inferred = inferStackFromTitle(deal.title);
+  return inferred.clipCoupon || inferred.subscribeSave;
+}
+
+function confirmLiveTotal(merchant: Merchant, sourceUrl?: string | null): string {
+  return `Confirm the live total at ${merchantLabel(merchant, sourceUrl)} before you pay.`;
+}
+
+function isGenericStackCopy(text: string): boolean {
+  return GENERIC_STACK_COPY.test(text);
+}
+
+/** Display-time only. Does not rewrite stored desk bullets. */
+export function publicBullets(deal: {
+  bullets: string[];
+  title: string;
+  merchant: Merchant;
+  promoCode?: string | null;
+  sourceUrl?: string | null;
+  affiliateUrl?: string | null;
+}): string[] {
+  if (dealHasCouponStack(deal)) return deal.bullets;
+  const confirm = confirmLiveTotal(deal.merchant, deal.sourceUrl || deal.affiliateUrl);
+  return deal.bullets.map((bullet) => (isGenericStackCopy(bullet) ? confirm : bullet));
+}
+
+/** Display-time only. Desk writeup boxes keep the stored stacking steps. */
+export function publicStackingSteps(deal: {
+  stackingSteps: StackingStep[];
+  title: string;
+  merchant: Merchant;
+  promoCode?: string | null;
+  sourceUrl?: string | null;
+  affiliateUrl?: string | null;
+}): StackingStep[] {
+  if (dealHasCouponStack(deal)) return deal.stackingSteps;
+  const confirm = confirmLiveTotal(deal.merchant, deal.sourceUrl || deal.affiliateUrl);
+  return deal.stackingSteps.map((step) =>
+    isGenericStackCopy(`${step.title} ${step.detail}`)
+      ? { ...step, title: "Confirm the live total", detail: confirm }
+      : step,
+  );
 }
 
 function money(value: number): string {

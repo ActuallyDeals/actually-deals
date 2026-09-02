@@ -9,6 +9,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { VoteWidget } from "@/components/vote-widget";
 import { originalWhyNote } from "@/lib/editorial";
+import { publicBullets } from "@/lib/stack-copy";
 import { formatRelativeTime, formatUsd } from "@/lib/format";
 import { isBrandedPlaceholder, isUsableImageUrl, resolveDealImage } from "@/lib/images";
 import { merchantLabel } from "@/lib/merchants";
@@ -81,7 +82,7 @@ export async function generateMetadata({
   if (!deal || deal.status !== "published") return { title: "Deal not found · Actually Deals" };
 
   const title = `${deal.title} · Actually Deals`;
-  const description = originalWhyNote(deal.summary) ?? deal.bullets[0];
+  const description = originalWhyNote(deal.summary) ?? publicBullets(deal)[0];
   const imageUrl = resolvedDealPhoto(deal);
   const metadata: Metadata = {
     title,
@@ -199,8 +200,8 @@ export default async function DealPage({
             </div>
 
             <ul className="mt-6 space-y-2 text-base leading-relaxed text-slate-700">
-              {deal.bullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
+              {publicBullets(deal).map((bullet, index) => (
+                <li key={`${index}:${bullet}`}>{bullet}</li>
               ))}
             </ul>
 

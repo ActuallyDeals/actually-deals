@@ -23,7 +23,7 @@ import { giftCardFaceValue } from "../src/lib/pricing.ts";
 import { isCouponOnlyDeal, isDirectRetailerListing, isRetailerShortUrl } from "../src/lib/outbound.ts";
 import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
 import { buildDanBullets, buildFacebookPost, buildInstagramCaption, buildSocialPost, extractDealMechanics } from "../src/lib/copy-engine.ts";
-import { looksClonedWriteup } from "../src/lib/stack-copy.ts";
+import { looksClonedWriteup, publicBullets } from "../src/lib/stack-copy.ts";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "../src/lib/disclosures.ts";
 
 assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ2KWHS");
@@ -58,6 +58,52 @@ const noUrlBullets = buildDanBullets({
   promoCode: null,
 });
 assert.equal(noUrlBullets.some((line) => line.includes("$399 at Store")), true);
+
+const clipCouponLine = "Clip any on-page coupon, then confirm the total before you pay.";
+const amazonNoCodeBullets = publicBullets({
+  title: "Kettle Brand Sea Salt Potato Chips",
+  merchant: "amazon",
+  promoCode: null,
+  bullets: [
+    "$3.49 at Amazon. Confirm the total at checkout.",
+    "Free Prime shipping on eligible orders; otherwise check the threshold.",
+    clipCouponLine,
+  ],
+});
+assert.equal(amazonNoCodeBullets.includes(clipCouponLine), false);
+assert.equal(
+  amazonNoCodeBullets.some((line) => line === "Confirm the live total at Amazon before you pay."),
+  true,
+);
+assert.equal(amazonNoCodeBullets[0], "$3.49 at Amazon. Confirm the total at checkout.");
+assert.equal(
+  amazonNoCodeBullets[1],
+  "Free Prime shipping on eligible orders; otherwise check the threshold.",
+);
+
+const amazonWithCodeBullets = publicBullets({
+  title: "Kettle Brand Sea Salt Potato Chips",
+  merchant: "amazon",
+  promoCode: "SAVE10",
+  bullets: [clipCouponLine],
+});
+assert.equal(amazonWithCodeBullets[0], clipCouponLine);
+
+const stackedAcBullets = publicBullets({
+  title: "[AC] $3.49* | Kettle chips at Amazon",
+  merchant: "amazon",
+  promoCode: null,
+  bullets: [clipCouponLine],
+});
+assert.equal(stackedAcBullets[0], clipCouponLine);
+
+const stackedSnsBullets = publicBullets({
+  title: "[SnS] $12* | Baby Trend at Amazon",
+  merchant: "amazon",
+  promoCode: null,
+  bullets: ["Turn on Subscribe & Save on this listing, then confirm the total. You can cancel after it ships."],
+});
+assert.equal(/Subscribe & Save/.test(stackedSnsBullets[0] ?? ""), true);
 assert.equal(
   buildSocialPost({
     title: "Storrow Sofa",

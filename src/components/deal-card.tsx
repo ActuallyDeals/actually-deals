@@ -7,6 +7,7 @@ import { merchantLabel } from "@/lib/merchants";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "@/lib/disclosures";
 import { dealHasProductLink, isCouponOnlyDeal } from "@/lib/outbound";
 import { publicPriceDisplay } from "@/lib/pricing";
+import { publicBullets } from "@/lib/stack-copy";
 import { isDeadListing, type Deal } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -82,8 +83,8 @@ export function DealCard({
           </div>
 
           <ul className="pointer-events-none mt-2.5 space-y-1 text-sm leading-relaxed text-slate-600">
-            {deal.bullets.slice(0, 3).map((bullet) => (
-              <li key={bullet}>{bullet}</li>
+            {publicBullets(deal).slice(0, 3).map((bullet, index) => (
+              <li key={`${index}:${bullet}`}>{bullet}</li>
             ))}
           </ul>
 

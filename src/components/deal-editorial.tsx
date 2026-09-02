@@ -1,4 +1,5 @@
 import { editorialSections, hasEditorialBlock } from "@/lib/editorial";
+import { publicStackingSteps } from "@/lib/stack-copy";
 import type { Deal } from "@/lib/types";
 
 export function DealEditorial({
@@ -8,10 +9,11 @@ export function DealEditorial({
   deal: Deal;
   staffEmptyHint?: boolean;
 }) {
-  const sections = editorialSections(deal);
+  const publicDeal = { ...deal, stackingSteps: publicStackingSteps(deal) };
+  const sections = editorialSections(publicDeal);
   const missingWriteup =
     staffEmptyHint && (!sections.why || !sections.stacking.length || !sections.verify);
-  if (!hasEditorialBlock(deal) && !missingWriteup) return null;
+  if (!hasEditorialBlock(publicDeal) && !missingWriteup) return null;
 
   return (
     <section className="mt-8 space-y-6 border-t border-slate-100 pt-6">
