@@ -92,6 +92,12 @@ export const MERCHANT_PROFILES: Record<Merchant, MerchantProfile> = {
     hostMatches: ["hotels.com"],
     color: "#D32F2F",
   },
+  priceline: {
+    id: "priceline",
+    label: "Priceline",
+    hostMatches: ["priceline.com"],
+    color: "#00A4E4",
+  },
   uber: {
     id: "uber",
     label: "Uber",
@@ -322,6 +328,16 @@ export function extractMerchantProductId(rawUrl: string, merchant: Merchant): st
         const fromQuery =
           url.searchParams.get("hotelId") ??
           url.searchParams.get("selectedHotelId") ??
+          url.searchParams.get("hotel_id");
+        const candidate = fromPath ?? fromQuery;
+        if (candidate && /^\d{3,}$/.test(candidate)) return candidate;
+        return null;
+      }
+      case "priceline": {
+        const fromPath = path.match(/\/relax\/at\/(\d{3,})(?:\/|$)/i)?.[1];
+        const fromQuery =
+          url.searchParams.get("hotelId") ??
+          url.searchParams.get("hotel-id") ??
           url.searchParams.get("hotel_id");
         const candidate = fromPath ?? fromQuery;
         if (candidate && /^\d{3,}$/.test(candidate)) return candidate;

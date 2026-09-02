@@ -564,8 +564,35 @@ assert.equal(hotelsWrapped.searchParams.get("url")?.includes("utm_campaign"), fa
 if (prevHotelsAid === undefined) delete process.env.AFFILIATE_CJ_HOTELS_AID;
 else process.env.AFFILIATE_CJ_HOTELS_AID = prevHotelsAid;
 
+const priceline =
+  "https://www.priceline.com/relax/at/70109804/from/20260901/to/20260903?utm_source=x";
+assert.equal(detectMerchant(priceline), "priceline");
+assert.equal(detectMerchant("https://priceline.com/hotels/"), "priceline");
+assert.equal(detectMerchant("https://www.kayak.com/hotels/nyc"), "other");
+assert.equal(merchantLabel("priceline"), "Priceline");
+assert.equal(extractMerchantProductId(priceline, "priceline"), "70109804");
+assert.equal(
+  extractMerchantProductId("https://www.priceline.com/hotels?hotel_id=70109804", "priceline"),
+  "70109804",
+);
+assert.equal(extractMerchantProductId("https://www.priceline.com/", "priceline"), null);
+const prevPricelineAid = process.env.AFFILIATE_CJ_PRICELINE_AID;
+delete process.env.AFFILIATE_CJ_PRICELINE_AID;
+assert.equal(attachAffiliate(priceline, "priceline").includes("anrdoezrs.net"), false);
+assert.equal(attachAffiliate(priceline, "priceline").includes("utm_source"), false);
+assert.equal(attachAffiliate(priceline, "priceline").includes("priceline.com"), true);
+process.env.AFFILIATE_CJ_PID = "8059705";
+process.env.AFFILIATE_CJ_PRICELINE_AID = "5556667";
+const pricelineWrapped = new URL(attachAffiliate(priceline, "priceline"));
+assert.equal(pricelineWrapped.hostname, "www.anrdoezrs.net");
+assert.equal(pricelineWrapped.pathname, "/click-8059705-5556667");
+assert.equal(pricelineWrapped.searchParams.get("url")?.includes("priceline.com"), true);
+assert.equal(pricelineWrapped.searchParams.get("url")?.includes("utm_source"), false);
+assert.equal([...pricelineWrapped.searchParams.keys()].join(","), "url");
+if (prevPricelineAid === undefined) delete process.env.AFFILIATE_CJ_PRICELINE_AID;
+else process.env.AFFILIATE_CJ_PRICELINE_AID = prevPricelineAid;
 
-for (const merchant of ["newegg", "ebay", "kohls", "dicks", "office-depot", "booking", "expedia", "hotels", "uber", "doordash", "grubhub"] as const) {
+for (const merchant of ["newegg", "ebay", "kohls", "dicks", "office-depot", "booking", "expedia", "hotels", "priceline", "uber", "doordash", "grubhub"] as const) {
   const image = resolveDealImage({ scrapedImageUrl: null, merchant, merchantProductId: "x" });
   assert.equal(image.imageTier, "placeholder");
   assert.equal(image.imageUrl, "/placeholders/other.svg");

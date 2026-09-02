@@ -30,7 +30,7 @@ Without those keys the app uses a local file/memory store (`.data/store.json`) a
 
 ## Affiliate tags
 
-Amazon outbound links use Associates Store ID `actuallydea07-20` (`NEXT_PUBLIC_AMAZON_AFFILIATE_TAG` or `AFFILIATE_AMAZON_TAG`). Do not use `actuallydeals-20`. Impact (Walmart, Target, Home Depot, Best Buy, Kohl's), CJ (Dick's, Office Depot, Booking.com, Expedia, Hotels.com), eBay, and Newegg/Rakuten wrap from `AFFILIATE_*` env IDs — see `.env.example`. Empty IDs produce clean merchant URLs with tracking stripped. Costco is not wrapped (no FlexOffers pattern in repo).
+Amazon outbound links use Associates Store ID `actuallydea07-20` (`NEXT_PUBLIC_AMAZON_AFFILIATE_TAG` or `AFFILIATE_AMAZON_TAG`). Do not use `actuallydeals-20`. Impact (Walmart, Target, Home Depot, Best Buy, Kohl's), CJ (Dick's, Office Depot, Booking.com, Expedia, Hotels.com, Priceline), eBay, and Newegg/Rakuten wrap from `AFFILIATE_*` env IDs — see `.env.example`. Empty IDs produce clean merchant URLs with tracking stripped. Costco is not wrapped (no FlexOffers pattern in repo).
 
 ## Scripts
 

@@ -383,7 +383,8 @@ export function titleFromProductUrl(
       merchant === "office-depot" ||
       merchant === "booking" ||
       merchant === "expedia" ||
-      merchant === "hotels"
+      merchant === "hotels" ||
+      merchant === "priceline"
     ) {
       const skip = new Set(["p", "-", "itm", "product", "products", "a"]);
       for (let i = parts.length - 1; i >= 0; i -= 1) {
@@ -433,6 +434,7 @@ function fallbackTitle(merchant: Merchant, productId: string | null, url: string
       booking: `Booking.com listing ${productId}`,
       expedia: `Expedia listing ${productId}`,
       hotels: `Hotels.com listing ${productId}`,
+      priceline: `Priceline listing ${productId}`,
       uber: `Uber item ${productId}`,
       doordash: `DoorDash item ${productId}`,
       grubhub: `Grubhub item ${productId}`,

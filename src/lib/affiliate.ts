@@ -169,6 +169,7 @@ export function affiliateTags() {
     bookingAid: envValue("AFFILIATE_CJ_BOOKING_AID"),
     expediaAid: envValue("AFFILIATE_CJ_EXPEDIA_AID"),
     hotelsAid: envValue("AFFILIATE_CJ_HOTELS_AID"),
+    pricelineAid: envValue("AFFILIATE_CJ_PRICELINE_AID"),
     ebayCampaignId: envValue("AFFILIATE_EBAY_CAMPAIGN_ID"),
     rakutenSid: envValue("AFFILIATE_RAKUTEN_SID") || RAKUTEN_SID,
     neweggMid: envValue("AFFILIATE_NEWEGG_MID"),
@@ -214,6 +215,8 @@ export function attachAffiliate(
         return tags.cjPid && tags.expediaAid ? cjDeepLink(tags.cjPid, tags.expediaAid, dest) : dest;
       case "hotels":
         return tags.cjPid && tags.hotelsAid ? cjDeepLink(tags.cjPid, tags.hotelsAid, dest) : dest;
+      case "priceline":
+        return tags.cjPid && tags.pricelineAid ? cjDeepLink(tags.cjPid, tags.pricelineAid, dest) : dest;
       case "ebay": {
 
         if (!tags.ebayCampaignId) return dest;

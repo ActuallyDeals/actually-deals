@@ -13,6 +13,7 @@ export const MERCHANTS = [
   "booking",
   "expedia",
   "hotels",
+  "priceline",
   "uber",
   "doordash",
   "grubhub",
