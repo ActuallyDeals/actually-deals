@@ -52,7 +52,7 @@ function productJsonLd(deal: Deal, slug: string) {
     url: canonical,
     brand: {
       "@type": "Brand",
-      name: merchantLabel(deal.merchant),
+      name: merchantLabel(deal.merchant, deal.sourceUrl || deal.affiliateUrl),
     },
     offers: {
       "@type": "Offer",
@@ -63,7 +63,7 @@ function productJsonLd(deal: Deal, slug: string) {
         deal.status === "expired" ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
       seller: {
         "@type": "Organization",
-        name: merchantLabel(deal.merchant),
+        name: merchantLabel(deal.merchant, deal.sourceUrl || deal.affiliateUrl),
       },
     },
   };
@@ -148,7 +148,7 @@ export default async function DealPage({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-slate-500">
-                  {merchantLabel(deal.merchant)}
+                  {merchantLabel(deal.merchant, deal.sourceUrl || deal.affiliateUrl)}
                   {deal.publishedAt ? ` · ${formatRelativeTime(deal.publishedAt)}` : ""}
                   {price.percent ? ` · ${price.percent}% off` : ""}
                 </p>
@@ -176,7 +176,7 @@ export default async function DealPage({
                       rel="nofollow sponsored noopener noreferrer"
                       className="inline-flex h-12 flex-1 items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700"
                     >
-                      Get Deal at {merchantLabel(deal.merchant)}
+                      Get Deal at {merchantLabel(deal.merchant, deal.sourceUrl || deal.affiliateUrl)}
                     </a>
                   ) : couponOnly ? null : (
                     <span className="inline-flex h-12 flex-1 items-center justify-center rounded-xl bg-slate-200 text-sm font-bold text-slate-500">

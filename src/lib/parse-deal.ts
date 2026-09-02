@@ -553,8 +553,9 @@ export async function parseDealUrl(rawUrl: string): Promise<ParsedDeal> {
     listPrice,
     percentOff: discountPercent(currentPrice, listPrice),
     promoCode: null,
+    sourceUrl,
   });
-  const stackingSteps = buildStackingSteps({ merchant, promoCode: null, currentPrice });
+  const stackingSteps = buildStackingSteps({ merchant, promoCode: null, currentPrice, sourceUrl });
   const socialPost = "";
 
   return {
@@ -574,7 +575,7 @@ export async function parseDealUrl(rawUrl: string): Promise<ParsedDeal> {
     pricesBlocked: currentPrice == null,
     scrapeNote: [
       scrapeBlocked
-        ? `${merchantLabel(merchant)} blocked the listing page. Merchant, cleaned URL, and a title from the link are filled.`
+        ? `${merchantLabel(merchant, sourceUrl)} blocked the listing page. Merchant, cleaned URL, and a title from the link are filled.`
         : null,
       currentPrice == null
         ? "Paste the live price from the tab — do not invent one."

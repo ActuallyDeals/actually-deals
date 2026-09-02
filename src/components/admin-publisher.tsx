@@ -52,7 +52,7 @@ function queueRowMeta(item: Deal): string {
     typeof item.currentPrice === "number" && item.currentPrice > 0
       ? formatUsd(item.currentPrice)
       : "price needed";
-  return [merchantLabel(item.merchant), price, item.promoCode || undefined].filter(Boolean).join(" · ");
+  return [merchantLabel(item.merchant, item.sourceUrl || item.affiliateUrl), price, item.promoCode || undefined].filter(Boolean).join(" · ");
 }
 
 interface Draft {
@@ -318,6 +318,7 @@ function applyStackToDraft(current: Draft, patch: Partial<Draft> = {}): Draft {
       clipCoupon: next.clipCoupon,
       subscribeSave: next.subscribeSave,
       promoCode: next.promoCode,
+      sourceUrl: next.sourceUrl,
     });
     const generic =
       !current.bullets[0]?.trim() ||
@@ -332,6 +333,7 @@ function applyStackToDraft(current: Draft, patch: Partial<Draft> = {}): Draft {
         clipCoupon: next.clipCoupon,
         subscribeSave: next.subscribeSave,
         promoCode: next.promoCode,
+        sourceUrl: next.sourceUrl,
       });
     }
   } else {
@@ -405,6 +407,7 @@ export function AdminPublisher({
       stack: from.stackNote,
       verify: from.verifyNote,
       slug,
+      sourceUrl: from.sourceUrl || url,
     };
   }
 
@@ -707,6 +710,7 @@ export function AdminPublisher({
         clipCoupon: from.clipCoupon,
         subscribeSave: from.subscribeSave,
         promoCode: from.promoCode,
+        sourceUrl: from.sourceUrl || url,
       });
     }
     return buildDanBullets({
@@ -1009,6 +1013,7 @@ export function AdminPublisher({
       currentPrice: draft.currentPrice,
       listPrice: draft.listPrice,
       promoCode: draft.promoCode,
+      sourceUrl: draft.sourceUrl || url,
     });
     const live = priceNumber(rewritten.currentPrice);
     const list = priceNumber(rewritten.listPrice);

@@ -117,8 +117,78 @@ export function detectMerchant(rawUrl: string): Merchant {
   return "other";
 }
 
-export function merchantLabel(merchant: Merchant): string {
-  return MERCHANT_PROFILES[merchant].label;
+const COMPOUND_TAILS = ["furniture"] as const;
+const MULTI_TLD_SLD = new Set(["co", "com", "org", "net", "ac", "gov"]);
+const SKIP_STORE_HOSTS = [
+  "slickdeals.net",
+  "sldc.net",
+  "sdclick.com",
+  "sdclick.net",
+  "linksynergy.com",
+  "geniuslink.com",
+  "geni.us",
+];
+
+function titleCaseToken(token: string): string {
+  if (!token) return "";
+  return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+}
+
+function expandCompounds(token: string): string {
+  const lower = token.toLowerCase();
+  for (const tail of COMPOUND_TAILS) {
+    if (lower.length > tail.length + 2 && lower.endsWith(tail)) {
+      const head = lower.slice(0, -tail.length);
+      if (/^[a-z]+$/.test(head)) return `${titleCaseToken(head)} ${titleCaseToken(tail)}`;
+    }
+  }
+  return titleCaseToken(lower);
+}
+
+function hostnameFromInput(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const candidate = /^(https?:\/\/|\/\/)/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const host = new URL(candidate).hostname.toLowerCase();
+    return host || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Short store name from a listing host. ashleyfurniture.com → Ashley Furniture. */
+export function storeLabelFromUrl(rawUrl: string | null | undefined): string {
+  if (!rawUrl?.trim()) return "Store";
+  const host = hostnameFromInput(rawUrl);
+  if (!host) return "Store";
+  const hostNoWww = host.replace(/^www\./, "");
+  if (SKIP_STORE_HOSTS.some((part) => hostNoWww === part || hostNoWww.endsWith(`.${part}`))) {
+    return "Store";
+  }
+
+  const parts = host.split(".").filter(Boolean);
+  while (parts.length > 1 && (parts[0] === "www" || parts[0] === "m" || parts[0] === "shop")) {
+    parts.shift();
+  }
+  if (parts.length < 2) return "Store";
+
+  let name = parts[parts.length - 2];
+  const tld = parts[parts.length - 1];
+  const sld = parts[parts.length - 2];
+  if (parts.length >= 3 && tld.length === 2 && MULTI_TLD_SLD.has(sld)) {
+    name = parts[parts.length - 3];
+  }
+  if (!name || name.length < 2 || /^\d+$/.test(name)) return "Store";
+
+  const tokens = name.split(/[-_]+/).filter(Boolean);
+  if (!tokens.length) return "Store";
+  return tokens.map(expandCompounds).join(" ");
+}
+
+export function merchantLabel(merchant: Merchant, listingUrl?: string | null): string {
+  if (merchant !== "other") return MERCHANT_PROFILES[merchant].label;
+  return storeLabelFromUrl(listingUrl);
 }
 
 const ASIN = /(?:[/](?:dp|gp\/product|gp\/aw\/d|d)[/])([A-Z0-9]{10})(?:[/?]|$)/i;

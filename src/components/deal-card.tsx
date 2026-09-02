@@ -61,7 +61,7 @@ export function DealCard({
 
         <div className="min-w-0 flex-1">
           <p className="pointer-events-none text-xs text-slate-500">
-            {merchantLabel(deal.merchant)}
+            {merchantLabel(deal.merchant, deal.sourceUrl || deal.affiliateUrl)}
             {deal.publishedAt ? ` · ${formatRelativeTime(deal.publishedAt)}` : " · Preview"}
             {price.percent ? ` · ${price.percent}% off` : ""}
           </p>

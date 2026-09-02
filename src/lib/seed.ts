@@ -53,6 +53,7 @@ function deal(partial: Omit<
         merchant: partial.merchant,
         promoCode: partial.promoCode,
         currentPrice: partial.currentPrice,
+        sourceUrl: partial.sourceUrl,
       }),
     socialPost:
       partial.socialPost ??
@@ -62,6 +63,7 @@ function deal(partial: Omit<
         currentPrice: partial.currentPrice,
         why: partial.summary,
         slug: partial.slug,
+        sourceUrl: partial.sourceUrl,
       }),
   };
 }

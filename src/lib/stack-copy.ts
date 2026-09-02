@@ -52,6 +52,7 @@ export function stackedHeadline(input: {
   clipCoupon: boolean;
   subscribeSave: boolean;
   promoCode: string;
+  sourceUrl?: string | null;
 }): string {
   const name = productNameFromTitle(input.title);
   const delivery = isAppCouponMerchant(input.merchant);
@@ -62,7 +63,7 @@ export function stackedHeadline(input: {
   );
   if (input.currentPrice == null || tags.length === 0) return name;
   const star = "*";
-  const store = merchantLabel(input.merchant);
+  const store = merchantLabel(input.merchant, input.sourceUrl);
   return `[${tags.join(", ")}] ${money(input.currentPrice)}${star} | ${name} at ${store}`;
 }
 
@@ -118,8 +119,9 @@ export function stackedBullets(input: {
   clipCoupon: boolean;
   subscribeSave: boolean;
   promoCode: string;
+  sourceUrl?: string | null;
 }): string[] {
-  const store = merchantLabel(input.merchant);
+  const store = merchantLabel(input.merchant, input.sourceUrl);
   if (isAppCouponMerchant(input.merchant)) {
     return buildDanBullets({
       merchant: input.merchant,
@@ -127,6 +129,7 @@ export function stackedBullets(input: {
       listPrice: input.listPrice,
       percentOff: null,
       promoCode: input.promoCode.trim() || null,
+      sourceUrl: input.sourceUrl,
     });
   }
   const pay = input.currentPrice != null ? money(input.currentPrice) : null;
@@ -253,6 +256,7 @@ export function rewritePastedDeal(
     currentPrice: string;
     listPrice: string;
     promoCode: string;
+    sourceUrl?: string | null;
   },
 ): {
   clipCoupon: boolean;
@@ -306,6 +310,7 @@ export function rewritePastedDeal(
       clipCoupon,
       subscribeSave,
       promoCode,
+      sourceUrl: current.sourceUrl,
     }),
   };
 }

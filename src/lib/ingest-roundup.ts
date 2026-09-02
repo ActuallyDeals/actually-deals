@@ -830,6 +830,7 @@ function parsedFromCandidate(
         listPrice,
         percentOff: discountPercent(currentPrice, listPrice),
         mechanics,
+        sourceUrl,
       })
     : buildDanBullets({
         merchant,
@@ -837,11 +838,12 @@ function parsedFromCandidate(
         listPrice,
         percentOff: discountPercent(currentPrice, listPrice),
         promoCode,
+        sourceUrl,
       });
   const stackingSteps = extra
-    ? buildMechanicsSteps({ merchant, currentPrice, mechanics })
-    : buildStackingSteps({ merchant, promoCode, currentPrice });
-  const summaryRaw = extra ? buildMechanicsWhy({ merchant, currentPrice, mechanics }) : null;
+    ? buildMechanicsSteps({ merchant, currentPrice, mechanics, sourceUrl })
+    : buildStackingSteps({ merchant, promoCode, currentPrice, sourceUrl });
+  const summaryRaw = extra ? buildMechanicsWhy({ merchant, currentPrice, mechanics, sourceUrl }) : null;
   const summary = summaryRaw && !looksClonedWriteup(summaryRaw) ? summaryRaw : null;
   const writeupBlob = [bullets.join(" "), stackingSteps.map((step) => `${step.title} ${step.detail}`).join(" "), summary ?? ""].join(
     " ",
@@ -853,8 +855,9 @@ function parsedFromCandidate(
       listPrice,
       percentOff: discountPercent(currentPrice, listPrice),
       promoCode,
+      sourceUrl,
     });
-    const fallbackSteps = buildStackingSteps({ merchant, promoCode, currentPrice });
+    const fallbackSteps = buildStackingSteps({ merchant, promoCode, currentPrice, sourceUrl });
     return finishParsed({
       merchant,
       productId,

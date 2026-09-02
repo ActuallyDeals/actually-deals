@@ -11,9 +11,10 @@ export function buildDanHeadline(input: {
   currentPrice: number | null;
   listPrice: number | null;
   promoCode?: string | null;
+  sourceUrl?: string | null;
 }): string {
   const name = input.title.trim() || "This item";
-  const store = merchantLabel(input.merchant);
+  const store = merchantLabel(input.merchant, input.sourceUrl);
   const code = input.promoCode ? " w/ Code" : "";
   if (input.currentPrice != null && input.listPrice != null) {
     return `${name} Only ${formatUsd(input.currentPrice)} at ${store} (Reg. ${formatUsd(input.listPrice)})${code}`;
@@ -32,7 +33,7 @@ export function buildDanBullets(input: {
   promoCode: string | null;
   sourceUrl?: string | null;
 }): string[] {
-  const store = merchantLabel(input.merchant);
+  const store = merchantLabel(input.merchant, input.sourceUrl);
   const price = input.currentPrice != null ? formatUsd(input.currentPrice) : null;
   const list = input.listPrice != null ? formatUsd(input.listPrice) : null;
   const code = input.promoCode?.trim() || "";
@@ -87,7 +88,7 @@ export function buildStackingSteps(input: {
   currentPrice: number | null;
   sourceUrl?: string | null;
 }): StackingStep[] {
-  const store = merchantLabel(input.merchant);
+  const store = merchantLabel(input.merchant, input.sourceUrl);
   const price = input.currentPrice != null ? formatUsd(input.currentPrice) : null;
   const code = input.promoCode?.trim() || "";
 
@@ -305,8 +306,9 @@ export function buildMechanicsBullets(input: {
   listPrice: number | null;
   percentOff: number | null;
   mechanics: DealMechanics;
+  sourceUrl?: string | null;
 }): string[] {
-  const store = merchantLabel(input.merchant);
+  const store = merchantLabel(input.merchant, input.sourceUrl);
   const price = input.currentPrice != null ? formatUsd(input.currentPrice) : null;
   const list = input.listPrice != null ? formatUsd(input.listPrice) : null;
   const priceText =
@@ -325,8 +327,9 @@ export function buildMechanicsSteps(input: {
   merchant: Merchant;
   currentPrice: number | null;
   mechanics: DealMechanics;
+  sourceUrl?: string | null;
 }): StackingStep[] {
-  const store = merchantLabel(input.merchant);
+  const store = merchantLabel(input.merchant, input.sourceUrl);
   const price = input.currentPrice != null ? formatUsd(input.currentPrice) : null;
   const code = input.mechanics.promoCode;
   const extra = input.mechanics.extraDeliveryFee;
@@ -396,9 +399,10 @@ export function buildMechanicsWhy(input: {
   merchant: Merchant;
   currentPrice: number | null;
   mechanics: DealMechanics;
+  sourceUrl?: string | null;
 }): string | null {
   if (!hasExtraMechanics(input.mechanics)) return null;
-  const store = merchantLabel(input.merchant);
+  const store = merchantLabel(input.merchant, input.sourceUrl);
   const price = input.currentPrice != null ? formatUsd(input.currentPrice) : null;
   const extra = input.mechanics.extraDeliveryFee;
   const bits: string[] = [];
@@ -469,6 +473,7 @@ type SocialComposeInput = {
   stack?: string | null;
   verify?: string | null;
   slug?: string | null;
+  sourceUrl?: string | null;
 };
 
 export type SocialDrafts = {
@@ -490,15 +495,15 @@ function couponDealName(title: string): string {
   return title.trim() || "This deal";
 }
 
-function couponHeadline(title: string, merchant: Merchant, promoCode?: string | null): string {
+function couponHeadline(title: string, merchant: Merchant, promoCode?: string | null, listingUrl?: string | null): string {
   const name = couponDealName(title);
-  const store = merchantLabel(merchant);
+  const store = merchantLabel(merchant, listingUrl);
   const code = promoCode?.trim();
   return code ? `${name} at ${store} w/ code ${code}` : `${name} at ${store}`;
 }
 
-function priceHeadline(title: string, merchant: Merchant, currentPrice: number): string {
-  return `${formatUsd(currentPrice)} ${shortDealName(title)} at ${merchantLabel(merchant)}`;
+function priceHeadline(title: string, merchant: Merchant, currentPrice: number, listingUrl?: string | null): string {
+  return `${formatUsd(currentPrice)} ${shortDealName(title)} at ${merchantLabel(merchant, listingUrl)}`;
 }
 
 function disclosureLine(merchant: Merchant): string {
@@ -524,7 +529,7 @@ function xPostFromHeadline(headline: string, input: SocialComposeInput, withCont
 
 function couponCaptionParts(input: SocialComposeInput, handle: string, urlEarly = false): string {
   const url = publicDealUrl(input.slug);
-  const parts = [couponHeadline(input.title, input.merchant, input.promoCode)];
+  const parts = [couponHeadline(input.title, input.merchant, input.promoCode, input.sourceUrl)];
   if (urlEarly && url) parts.push("", url);
   parts.push("", disclosureLine(input.merchant), "", handle);
   if (!urlEarly && url) parts.push("", url);
@@ -534,10 +539,10 @@ function couponCaptionParts(input: SocialComposeInput, handle: string, urlEarly 
 /** Original X draft from our fields only. Empty when there is no live price and no coupon/app deal. Does not post. */
 export function buildSocialPost(input: SocialComposeInput): string {
   if (hasLivePrice(input.currentPrice)) {
-    return xPostFromHeadline(priceHeadline(input.title, input.merchant, input.currentPrice), input, true);
+    return xPostFromHeadline(priceHeadline(input.title, input.merchant, input.currentPrice, input.sourceUrl), input, true);
   }
   if (canWriteCouponSocial(input)) {
-    return xPostFromHeadline(couponHeadline(input.title, input.merchant, input.promoCode), input, false);
+    return xPostFromHeadline(couponHeadline(input.title, input.merchant, input.promoCode, input.sourceUrl), input, false);
   }
   return "";
 }
@@ -546,7 +551,7 @@ export function buildSocialPost(input: SocialComposeInput): string {
 export function buildInstagramCaption(input: SocialComposeInput): string {
   if (hasLivePrice(input.currentPrice)) {
     const url = publicDealUrl(input.slug);
-    const parts = [priceHeadline(input.title, input.merchant, input.currentPrice)];
+    const parts = [priceHeadline(input.title, input.merchant, input.currentPrice, input.sourceUrl)];
     const context = oneContextLine(input.why, input.stack);
     if (context) parts.push("", context);
     parts.push("", disclosureLine(input.merchant), "", `@${SOCIAL.instagram.handle}`);
@@ -563,7 +568,7 @@ export function buildInstagramCaption(input: SocialComposeInput): string {
 export function buildFacebookPost(input: SocialComposeInput): string {
   if (hasLivePrice(input.currentPrice)) {
     const url = publicDealUrl(input.slug);
-    const parts = [priceHeadline(input.title, input.merchant, input.currentPrice)];
+    const parts = [priceHeadline(input.title, input.merchant, input.currentPrice, input.sourceUrl)];
     if (url) parts.push("", url);
     const why = input.why?.trim();
     if (why) parts.push("", why);

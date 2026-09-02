@@ -16,17 +16,55 @@ import {
   resolvePasteTarget,
   shouldFetchRetailerListing,
 } from "../src/lib/ingest-roundup.ts";
-import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
+import { detectMerchant, extractMerchantProductId, merchantLabel, storeLabelFromUrl } from "../src/lib/merchants.ts";
 import { canonicalSourceUrl, extractFromHtml, titleFromProductUrl } from "../src/lib/parse-deal.ts";
 import { giftCardFaceValue } from "../src/lib/pricing.ts";
 import { isCouponOnlyDeal, isDirectRetailerListing, isRetailerShortUrl } from "../src/lib/outbound.ts";
 import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
-import { buildFacebookPost, buildInstagramCaption, buildSocialPost, extractDealMechanics } from "../src/lib/copy-engine.ts";
+import { buildDanBullets, buildFacebookPost, buildInstagramCaption, buildSocialPost, extractDealMechanics } from "../src/lib/copy-engine.ts";
 import { looksClonedWriteup } from "../src/lib/stack-copy.ts";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "../src/lib/disclosures.ts";
 
 assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ2KWHS");
 assert.equal(extractMerchantProductId(withHttps("amazon.com/dp/B08PQ2KWHS"), "amazon"), "B08PQ2KWHS");
+
+assert.equal(storeLabelFromUrl("ashleyfurniture.com"), "Ashley Furniture");
+assert.equal(storeLabelFromUrl("www.wayfair.com"), "Wayfair");
+assert.equal(storeLabelFromUrl("shop.example.co.uk"), "Example");
+assert.equal(storeLabelFromUrl(""), "Store");
+assert.equal(storeLabelFromUrl(null), "Store");
+assert.equal(storeLabelFromUrl("not a url"), "Store");
+assert.equal(merchantLabel("amazon", "https://www.ashleyfurniture.com/p/x"), "Amazon");
+assert.equal(merchantLabel("other", "https://www.ashleyfurniture.com/p/storrow_sofa/2920338.html"), "Ashley Furniture");
+assert.equal(merchantLabel("other"), "Store");
+assert.equal(merchantLabel("uber"), "Uber");
+const ashleyBullets = buildDanBullets({
+  merchant: "other",
+  currentPrice: 399,
+  listPrice: null,
+  percentOff: null,
+  promoCode: null,
+  sourceUrl: "https://www.ashleyfurniture.com/p/storrow_sofa/2920338.html",
+});
+assert.equal(ashleyBullets.some((line) => line.includes("$399 at Ashley Furniture")), true);
+assert.equal(ashleyBullets.some((line) => /\bat Store\b/.test(line)), false);
+const noUrlBullets = buildDanBullets({
+  merchant: "other",
+  currentPrice: 399,
+  listPrice: null,
+  percentOff: null,
+  promoCode: null,
+});
+assert.equal(noUrlBullets.some((line) => line.includes("$399 at Store")), true);
+assert.equal(
+  buildSocialPost({
+    title: "Storrow Sofa",
+    merchant: "other",
+    currentPrice: 399,
+    sourceUrl: "https://www.ashleyfurniture.com/p/storrow_sofa/2920338.html",
+  }).includes("$399 Storrow Sofa at Ashley Furniture"),
+  true,
+);
 
 const amazon =
   "https://www.amazon.com/Instant-Pot/dp/B08PQ2KWHS?tag=other-20&th=1&psc=1&utm_source=ig&pf_rd_r=ABC&ref=sr_1_1";
@@ -732,6 +770,9 @@ try {
   assert.equal(pasted.deals[0]?.currentPrice, 399);
   assert.equal(pasted.deals[0]?.title.includes("Ashley Storrow Sofa"), true);
   assert.equal(/biggest living room|0% APR|collection packages/i.test(pasted.deals[0]?.bullets.join(" ") ?? ""), false);
+  assert.equal(/Ashley Furniture/.test(pasted.deals[0]?.bullets.join(" ") ?? ""), true);
+  assert.equal(/\bat Store\b/.test(pasted.deals[0]?.bullets.join(" ") ?? ""), false);
+  assert.equal(/Ashley Furniture/.test(pasted.deals[0]?.stackingSteps.map((step) => step.title).join(" ") ?? ""), true);
   assert.equal(ashleyListingFetches, 1);
 
   const toys = await ingestDealPaste("https://9to5toys.com/2026/09/01/iphone-17-pro-deals/");

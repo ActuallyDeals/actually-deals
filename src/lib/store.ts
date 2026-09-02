@@ -366,6 +366,7 @@ function toDealFromInput(input: PublishDealInput, existingSlugs: Set<string>, pr
           stack: writeup.stack,
           verify: writeup.verify,
           slug,
+          sourceUrl,
         }),
       ) ||
       null,
