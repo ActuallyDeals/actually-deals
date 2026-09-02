@@ -112,6 +112,10 @@ export interface ParsedDeal {
   socialPost: string;
   pricesBlocked: boolean;
   scrapeNote: string | null;
+  promoCode?: string | null;
+  clipCoupon?: boolean;
+  subscribeSave?: boolean;
+  summary?: string | null;
 }
 
 export interface PublishDealInput {

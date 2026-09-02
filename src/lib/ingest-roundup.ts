@@ -1,7 +1,17 @@
 import * as cheerio from "cheerio";
 import type { AnyNode } from "domhandler";
 import { attachAffiliate, cleanTrackingParams, withHttps } from "@/lib/affiliate";
-import { buildDanBullets, buildStackingSteps, discountPercent } from "@/lib/copy-engine";
+import {
+  buildDanBullets,
+  buildMechanicsBullets,
+  buildMechanicsSteps,
+  buildMechanicsWhy,
+  buildStackingSteps,
+  discountPercent,
+  extractDealMechanics,
+  hasExtraMechanics,
+} from "@/lib/copy-engine";
+import { looksClonedWriteup } from "@/lib/stack-copy";
 import { parseMoney } from "@/lib/format";
 import { cdnImageFor, resolveDealImage } from "@/lib/images";
 import { detectMerchant, extractMerchantProductId } from "@/lib/merchants";
@@ -19,17 +29,35 @@ const UNWRAP_TIMEOUT_MS = 5000;
 const ROUNDUP_CAP = 12;
 /** Classes/ids proven on 9to5Toys recirc: sidebar cards, related guides, newsletter, author gear, in-post media-text promos. */
 const SKIP_CLOSEST =
-  "nav, footer, header, aside, .sidebar, .author-gear, .author-gear-items, .author-box, .author-bio, .author-bio-container, .related, .related-guides, .related-guide, .recommended, .visitor-promo, .featured-items, .ninetofive-newsletter-subscribe, .wp-block-media-text, #comments, .comments";
+  "nav, footer, header, aside, .sidebar, .author-gear, .author-gear-items, .author-box, .author-bio, .author-bio-container, .related, .related-guides, .related-guide, .recommended, .visitor-promo, .featured-items, .ninetofive-newsletter-subscribe, .wp-block-media-text, #comments, .comments, #commentsBox, .commentsBox, .commentsSectionV2, .leaveACommentV2, .dealDetailsPage__card--commentsSection, .dealDetailsSidebar, .sidebarDeals, .communityWiki, #communityNotesTab, .aboutThePosterTab, .recommendedDealAlerts, .youMightLike, .comment, .reply";
 
-const NESTED_KEYS = ["u", "url", "destination", "dest", "murl", "target", "redirect", "rurl", "link"];
-const WRAPPER_PATH = /(?:^|\/)(?:goto|out|recomm|aff)(?:\/|$)/i;
-const WRAPPER_HOSTS = ["geni.us", "geniuslink.com"];
+const NESTED_KEYS = [
+  "u",
+  "url",
+  "destination",
+  "dest",
+  "murl",
+  "target",
+  "redirect",
+  "rurl",
+  "link",
+  "trd",
+  "u2",
+  "u3",
+  "sdurl",
+  "desturl",
+  "targeturl",
+];
+const WRAPPER_PATH = /(?:^|\/)(?:goto|out|recomm|aff|click|visit|attachdeal)(?:\/|$|\.php)/i;
+const WRAPPER_HOSTS = ["geni.us", "geniuslink.com", "sldc.net", "sdclick.com", "sdclick.net", "linksynergy.com"];
+const SLICKDEALS_THREAD_PATH = /\/(?:f\/\d+|forums\/showthread\.php)/i;
 
 export interface RoundupCandidate {
   href: string;
   title: string;
   currentPrice: number | null;
   listPrice: number | null;
+  sourceText?: string;
 }
 
 export interface IngestResult {
@@ -78,7 +106,7 @@ function nestedRetailerUrls(href: string): string[] {
       const decoded = decodeMaybeUrl(nested);
       if (decoded) found.push(decoded);
     }
-    const pathEmbedded = url.pathname.match(/\/(?:goto|out|recomm|aff)\/(.+)/i);
+    const pathEmbedded = url.pathname.match(/\/(?:goto|out|recomm|aff|click|visit|attachdeal)\/(.+)/i);
     if (pathEmbedded?.[1]) {
       let rest = pathEmbedded[1];
       try {
@@ -95,7 +123,7 @@ function nestedRetailerUrls(href: string): string[] {
   return found;
 }
 
-function isClickWrapper(href: string): boolean {
+export function isClickWrapper(href: string): boolean {
   try {
     const url = new URL(href);
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
@@ -104,6 +132,36 @@ function isClickWrapper(href: string): boolean {
   } catch {
     return false;
   }
+}
+
+function hostnameOf(href: string): string | null {
+  try {
+    return new URL(href).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/** slickdeals.net thread pages only — not daily/money blogs, not click hosts. */
+export function isSlickdealsThreadUrl(href: string): boolean {
+  try {
+    const url = new URL(href);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (host !== "slickdeals.net") return false;
+    return SLICKDEALS_THREAD_PATH.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+const FORUM_CLICK_HOSTS = ["sldc.net", "sdclick.com", "sdclick.net"];
+
+/** Forum pages and SD click hosts — never a retailer listing. */
+export function isDealForumUrl(href: string): boolean {
+  const host = hostnameOf(href);
+  if (!host) return false;
+  if (host === "slickdeals.net" || host.endsWith(".slickdeals.net")) return true;
+  return FORUM_CLICK_HOSTS.some((part) => host === part || host.endsWith(`.${part}`));
 }
 
 function isRetailerish(href: string): boolean {
@@ -124,9 +182,20 @@ function retailerProductHref(href: string): string | null {
 export function pickRetailerHref(raw: string, pageUrl: string): string | null {
   const absolute = absoluteUrl(raw, pageUrl);
   if (!absolute) return null;
-  for (const candidate of nestedRetailerUrls(absolute)) {
+  const nested = nestedRetailerUrls(absolute);
+  for (const candidate of nested) {
     const hit = retailerProductHref(candidate);
     if (hit) return hit;
+  }
+  for (const candidate of nested) {
+    if (candidate === absolute) continue;
+    if (isDealForumUrl(candidate) || isClickWrapper(candidate)) continue;
+    try {
+      const path = new URL(candidate).pathname.split("/").filter(Boolean);
+      if (path.length >= 2) return candidate;
+    } catch {
+      // ignore
+    }
   }
   if (isClickWrapper(absolute)) return absolute;
   return null;
@@ -177,12 +246,99 @@ function titleFromItemText(text: string): string {
   return cleaned.slice(0, 140);
 }
 
-function contentRoot($: cheerio.CheerioAPI) {
+function cleanThreadTitle(raw: string): string {
+  return titleFromItemText(
+    raw
+      .replace(/\s*[-|–—]\s*\d{4}-\d{2}-\d{2}\s*$/g, " ")
+      .replace(/\bfrontpage deal\b/gi, " ")
+      .replace(/\bdeal score\b\s*\d*/gi, " "),
+  );
+}
+
+const SLICKDEALS_OP_SELECTORS = [
+  ".dealDetailsTab__bodyHtml",
+  ".dealDetailsRawHtml",
+  ".dealDetailsTab__originalPost",
+  "#posts .postbit:first-child .postcontent",
+  "#posts .postcontainer:first-child .postcontent",
+  "#posts .post:first-child .post_message",
+];
+
+function slickdealsContentRoots($: cheerio.CheerioAPI) {
+  const roots: ReturnType<cheerio.CheerioAPI>[] = [];
+  const seen = new Set<unknown>();
+  for (const sel of [...SLICKDEALS_OP_SELECTORS, ".dealDetailsMainBlock"]) {
+    const node = $(sel).first();
+    if (!node.length) continue;
+    const el = node.get(0);
+    if (!el || seen.has(el)) continue;
+    seen.add(el);
+    roots.push(node);
+  }
+  return roots;
+}
+
+function contentRoot($: cheerio.CheerioAPI, pageUrl?: string) {
+  if (pageUrl && isSlickdealsThreadUrl(pageUrl)) {
+    const sd = slickdealsContentRoots($);
+    if (sd[0]) return sd[0];
+  }
   for (const sel of [".post-content", ".entry-content", ".post-body", "article", "main"]) {
     const node = $(sel).first();
     if (node.length) return node;
   }
   return $("body");
+}
+
+function priceFromSlickdealsSlug(pageUrl: string): number | null {
+  try {
+    const path = new URL(pageUrl).pathname;
+    const match = path.match(/\/f\/\d+-.+-(\d{2,5})$/i);
+    if (!match) return null;
+    const value = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(value) || value < 1) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+function opListPrice(text: string): number | null {
+  const priced = pricesFromText(text);
+  return priced.list;
+}
+
+function slickdealsThreadMeta($: cheerio.CheerioAPI, pageUrl: string): {
+  title: string | null;
+  currentPrice: number | null;
+  listPrice: number | null;
+  opText: string;
+} {
+  const opNode =
+    SLICKDEALS_OP_SELECTORS.map((sel) => $(sel).first()).find((node) => node.length) ?? $();
+  const opText = (opNode.length ? opNode.text() : "").replace(/\s+/g, " ").trim();
+  const threadTitle =
+    cleanThreadTitle($(".dealDetailsMainBlock__dealTitle").first().text()) ||
+    cleanThreadTitle($('meta[property="og:title"]').attr("content") ?? "") ||
+    cleanThreadTitle($("title").first().text()) ||
+    cleanThreadTitle(decodeURIComponent(new URL(pageUrl).pathname.split("/").pop() ?? ""));
+  const fromOp = pricesFromText(opText);
+  const fromTitle = pricesFromText(
+    $(".dealDetailsMainBlock__dealTitle").first().text() || $('meta[property="og:title"]').attr("content") || $("title").first().text() || "",
+  );
+  const current =
+    fromOp.current ??
+    parseMoney($(".dealDetailsMainBlock__finalPrice").first().text()) ??
+    fromTitle.current ??
+    priceFromSlickdealsSlug(pageUrl);
+  // Was-price only when the original post clearly states reg/was/list — not SD chrome.
+  const list = opListPrice(opText);
+  return {
+    title: threadTitle || null,
+    currentPrice: current,
+    listPrice: list != null && current != null && list > current ? list : null,
+    opText,
+  };
 }
 
 function skipped($: cheerio.CheerioAPI, el: AnyNode): boolean {
@@ -222,10 +378,11 @@ function pushUnique(list: RoundupCandidate[], seen: Set<string>, candidate: Roun
   list.push(candidate);
 }
 
-/** Sync extract of retailer product links + on-page prices. Does not invent prices. */
-export function extractRetailerCandidates(html: string, pageUrl: string): RoundupCandidate[] {
-  const $ = cheerio.load(html);
-  const root = contentRoot($);
+function collectFromRoot(
+  $: cheerio.CheerioAPI,
+  root: ReturnType<cheerio.CheerioAPI>,
+  pageUrl: string,
+): RoundupCandidate[] {
   const listHits: RoundupCandidate[] = [];
   const seen = new Set<string>();
 
@@ -254,10 +411,59 @@ export function extractRetailerCandidates(html: string, pageUrl: string): Roundu
   return all.slice(0, ROUNDUP_CAP);
 }
 
+function overlaySlickdealsThread(
+  candidates: RoundupCandidate[],
+  $: cheerio.CheerioAPI,
+  pageUrl: string,
+): RoundupCandidate[] {
+  if (!isSlickdealsThreadUrl(pageUrl) || candidates.length === 0) return candidates;
+  const thread = slickdealsThreadMeta($, pageUrl);
+  return candidates.map((candidate) => ({
+    ...candidate,
+    title: thread.title || candidate.title,
+    currentPrice: candidate.currentPrice ?? thread.currentPrice,
+    listPrice:
+      thread.listPrice != null &&
+      (candidate.currentPrice ?? thread.currentPrice) != null &&
+      thread.listPrice > (candidate.currentPrice ?? thread.currentPrice)!
+        ? thread.listPrice
+        : null,
+    sourceText: thread.opText || candidate.sourceText,
+  }));
+}
+
+/** Sync extract of retailer product links + on-page prices. Does not invent prices. */
+export function extractRetailerCandidates(html: string, pageUrl: string): RoundupCandidate[] {
+  const $ = cheerio.load(html);
+  const sdThread = isSlickdealsThreadUrl(pageUrl);
+  const roots = sdThread ? slickdealsContentRoots($) : [contentRoot($, pageUrl)];
+  const merged: RoundupCandidate[] = [];
+  const seen = new Set<string>();
+  for (const root of roots) {
+    if (!root.length) continue;
+    for (const candidate of collectFromRoot($, root, pageUrl)) {
+      pushUnique(merged, seen, candidate);
+    }
+  }
+  const sliced = merged.slice(0, ROUNDUP_CAP);
+  return overlaySlickdealsThread(sliced, $, pageUrl);
+}
+
 function firstProductUrl(href: string): string | null {
-  for (const candidate of nestedRetailerUrls(href)) {
+  const nested = nestedRetailerUrls(href);
+  for (const candidate of nested) {
     const merchant = detectMerchant(candidate);
     if (merchant !== "other" && extractMerchantProductId(candidate, merchant)) return candidate;
+  }
+  for (const candidate of nested) {
+    if (candidate === href) continue;
+    if (isDealForumUrl(candidate) || isClickWrapper(candidate)) continue;
+    try {
+      const path = new URL(candidate).pathname.split("/").filter(Boolean);
+      if (path.length >= 2) return candidate;
+    } catch {
+      // ignore
+    }
   }
   return null;
 }
@@ -269,6 +475,9 @@ async function unwrapRedirects(rawUrl: string): Promise<string> {
     if (nestedProduct) return nestedProduct;
     const merchant = detectMerchant(current);
     if (merchant !== "other" && extractMerchantProductId(current, merchant)) return current;
+    if (step > 0 && !isClickWrapper(current) && !isDealForumUrl(current) && !isRetailerShortUrl(current)) {
+      return current;
+    }
     try {
       const response = await fetch(current, {
         method: "GET",
@@ -318,13 +527,59 @@ function parsedFromCandidate(
   if (face != null && (listPrice == null || listPrice < face) && (currentPrice == null || face > currentPrice)) {
     listPrice = face;
   }
-  const bullets = buildDanBullets({
-    merchant,
-    currentPrice,
-    listPrice,
-    percentOff: discountPercent(currentPrice, listPrice),
-    promoCode: null,
-  });
+  const mechanics = extractDealMechanics(candidate.sourceText ?? "");
+  const promoCode = mechanics.promoCode;
+  const extra = hasExtraMechanics(mechanics);
+  const bullets = extra
+    ? buildMechanicsBullets({
+        merchant,
+        currentPrice,
+        listPrice,
+        percentOff: discountPercent(currentPrice, listPrice),
+        mechanics,
+      })
+    : buildDanBullets({
+        merchant,
+        currentPrice,
+        listPrice,
+        percentOff: discountPercent(currentPrice, listPrice),
+        promoCode,
+      });
+  const stackingSteps = extra
+    ? buildMechanicsSteps({ merchant, currentPrice, mechanics })
+    : buildStackingSteps({ merchant, promoCode, currentPrice });
+  const summaryRaw = extra ? buildMechanicsWhy({ merchant, currentPrice, mechanics }) : null;
+  const summary = summaryRaw && !looksClonedWriteup(summaryRaw) ? summaryRaw : null;
+  const writeupBlob = [bullets.join(" "), stackingSteps.map((step) => `${step.title} ${step.detail}`).join(" "), summary ?? ""].join(
+    " ",
+  );
+  if (looksClonedWriteup(writeupBlob)) {
+    const fallbackBullets = buildDanBullets({
+      merchant,
+      currentPrice,
+      listPrice,
+      percentOff: discountPercent(currentPrice, listPrice),
+      promoCode,
+    });
+    const fallbackSteps = buildStackingSteps({ merchant, promoCode, currentPrice });
+    return finishParsed({
+      merchant,
+      productId,
+      sourceUrl,
+      affiliateUrl,
+      image,
+      title: candidate.title || "Untitled deal",
+      currentPrice,
+      listPrice,
+      bullets: fallbackBullets,
+      stackingSteps: fallbackSteps,
+      unwrapFailed,
+      promoCode,
+      clipCoupon: mechanics.clipCoupon,
+      subscribeSave: mechanics.subscribeSave,
+      summary: null,
+    });
+  }
   const notes = [
     unwrapFailed ? "Short link did not unwrap. Confirm the retailer URL before Ready." : null,
     currentPrice == null ? "Paste the live price from the listing. Do not invent one." : null,
@@ -346,10 +601,63 @@ function parsedFromCandidate(
     imageUrl: image.imageUrl,
     imageTier: image.imageTier,
     bullets,
-    stackingSteps: buildStackingSteps({ merchant, promoCode: null, currentPrice }),
+    stackingSteps,
     socialPost: "",
     pricesBlocked: currentPrice == null,
     scrapeNote: notes || null,
+    promoCode,
+    clipCoupon: mechanics.clipCoupon,
+    subscribeSave: mechanics.subscribeSave,
+    summary,
+  };
+}
+
+function finishParsed(input: {
+  merchant: Merchant;
+  productId: string | null;
+  sourceUrl: string;
+  affiliateUrl: string;
+  image: ReturnType<typeof resolveDealImage>;
+  title: string;
+  currentPrice: number | null;
+  listPrice: number | null;
+  bullets: string[];
+  stackingSteps: ReturnType<typeof buildStackingSteps>;
+  unwrapFailed: boolean;
+  promoCode: string | null;
+  clipCoupon: boolean;
+  subscribeSave: boolean;
+  summary: string | null;
+}): ParsedDeal {
+  const notes = [
+    input.unwrapFailed ? "Short link did not unwrap. Confirm the retailer URL before Ready." : null,
+    input.currentPrice == null ? "Paste the live price from the listing. Do not invent one." : null,
+    input.image.imageTier === "placeholder" && !cdnImageFor(input.merchant, input.productId)
+      ? "Paste the product Image URL from the listing. Do not generate a lifestyle shot."
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    merchant: input.merchant,
+    merchantProductId: input.productId,
+    sourceUrl: input.sourceUrl,
+    affiliateUrl: input.affiliateUrl,
+    title: input.title,
+    currentPrice: input.currentPrice,
+    listPrice: input.listPrice,
+    scrapedImageUrl: input.image.imageTier === "cdn" ? input.image.imageUrl : null,
+    imageUrl: input.image.imageUrl,
+    imageTier: input.image.imageTier,
+    bullets: input.bullets,
+    stackingSteps: input.stackingSteps,
+    socialPost: "",
+    pricesBlocked: input.currentPrice == null,
+    scrapeNote: notes || null,
+    promoCode: input.promoCode,
+    clipCoupon: input.clipCoupon,
+    subscribeSave: input.subscribeSave,
+    summary: input.summary,
   };
 }
 
@@ -398,21 +706,41 @@ async function ingestThirdPartyPage(rawUrl: string): Promise<IngestResult> {
 
   const deals: ParsedDeal[] = [];
   const seen = new Set<string>();
+  let droppedWrappers = 0;
   for (const candidate of candidates) {
     let unwrapped = candidate.href;
     let unwrapFailed = false;
     if (hrefNeedsUnwrap(candidate.href)) {
       unwrapped = await unwrapRedirects(candidate.href);
+      if (isDealForumUrl(unwrapped) || (isClickWrapper(unwrapped) && detectMerchant(unwrapped) === "other")) {
+        droppedWrappers += 1;
+        continue;
+      }
       const merchant = detectMerchant(unwrapped);
       if (merchant === "other" || !extractMerchantProductId(unwrapped, merchant)) {
         unwrapFailed = isRetailerShortUrl(candidate.href) || isClickWrapper(candidate.href);
+        if (!isDealForumUrl(unwrapped) && !isClickWrapper(unwrapped) && merchant === "other") {
+          unwrapFailed = false;
+        }
       }
+    } else if (isDealForumUrl(unwrapped)) {
+      droppedWrappers += 1;
+      continue;
     }
     const deal = parsedFromCandidate(candidate, unwrapped, unwrapFailed);
     const key = listingKey(deal.sourceUrl, deal.merchant, deal.merchantProductId);
     if (seen.has(key)) continue;
     seen.add(key);
     deals.push(deal);
+  }
+
+  if (deals.length === 0) {
+    return {
+      deals: [],
+      scrapeNote: droppedWrappers
+        ? "Could not unwrap the retailer link from that thread. Paste the store product URL. Do not invent one."
+        : "No retailer product links found on that page. Paste an Amazon, Walmart, Target, Home Depot, Best Buy, Costco, Newegg, eBay, Kohl's, Dick's, or Office Depot product URL.",
+    };
   }
 
   const missing = deals.filter((deal) => deal.currentPrice == null).length;
@@ -439,6 +767,9 @@ function looksLikeDirectListing(rawUrl: string): boolean {
 export async function ingestDealPaste(rawUrl: string): Promise<IngestResult> {
   const trimmed = rawUrl.trim();
   if (!trimmed) throw new ParseDealError("Paste a product URL to parse.");
+  if (isSlickdealsThreadUrl(withHttps(trimmed))) {
+    return ingestThirdPartyPage(trimmed);
+  }
   if (looksLikeDirectListing(trimmed)) {
     const parsed = await parseDealUrl(trimmed);
     return { deals: [parsed], scrapeNote: parsed.scrapeNote };

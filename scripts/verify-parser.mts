@@ -2,13 +2,21 @@ import assert from "node:assert/strict";
 import { attachAffiliate, cleanTrackingParams, withHttps } from "../src/lib/affiliate.ts";
 import { imageFallbackChain, isBrandedPlaceholder, resolveDealImage } from "../src/lib/images.ts";
 import { findDuplicateDeal } from "../src/lib/desk.ts";
-import { dealsFromRoundupCandidates, extractRetailerCandidates, pickRetailerHref } from "../src/lib/ingest-roundup.ts";
+import { readFileSync } from "node:fs";
+import {
+  dealsFromRoundupCandidates,
+  extractRetailerCandidates,
+  isClickWrapper,
+  isSlickdealsThreadUrl,
+  pickRetailerHref,
+} from "../src/lib/ingest-roundup.ts";
 import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
 import { canonicalSourceUrl, titleFromProductUrl } from "../src/lib/parse-deal.ts";
 import { giftCardFaceValue } from "../src/lib/pricing.ts";
 import { isCouponOnlyDeal, isDirectRetailerListing, isRetailerShortUrl } from "../src/lib/outbound.ts";
 import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
-import { buildFacebookPost, buildInstagramCaption, buildSocialPost } from "../src/lib/copy-engine.ts";
+import { buildFacebookPost, buildInstagramCaption, buildSocialPost, extractDealMechanics } from "../src/lib/copy-engine.ts";
+import { looksClonedWriteup } from "../src/lib/stack-copy.ts";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "../src/lib/disclosures.ts";
 
 assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ2KWHS");
@@ -422,5 +430,97 @@ assert.equal(pricedFb.includes("Verify:"), false);
 assert.equal(pricedFb.includes(AMAZON_ASSOCIATE_DISCLOSURE), true);
 assert.equal(pricedFb.includes("ActuallyDeals"), true);
 assert.equal(pricedFb.includes("vote Expired"), false);
+
+assert.equal(isSlickdealsThreadUrl("https://slickdeals.net/f/19957455-ashley-storrow-sofa-399"), true);
+assert.equal(isSlickdealsThreadUrl("https://www.slickdeals.net/f/19957455-ashley-storrow-sofa-399"), true);
+assert.equal(isSlickdealsThreadUrl("https://daily.slickdeals.net/stores/amazon/"), false);
+assert.equal(isClickWrapper("https://slickdeals.net/click?trd=Get+Deal+at+Ashley&sdtid=19957455"), true);
+assert.equal(isClickWrapper("https://slickdeals.net/visit?sid=1"), true);
+assert.equal(isClickWrapper("https://slickdeals.net/attachdeal?id=1"), true);
+assert.equal(isClickWrapper("https://sldc.net/abc"), true);
+assert.equal(isClickWrapper("https://slickdeals.net/f/19957455-ashley-storrow-sofa-399"), false);
+
+const sdPage = "https://slickdeals.net/f/19957455-ashley-storrow-sofa-399";
+assert.equal(
+  pickRetailerHref(
+    "https://slickdeals.net/click?url=https%3A%2F%2Fwww.amazon.com%2Fdp%2FB08PQ2KWHS%3Ftag%3Dslickdeals-20",
+    sdPage,
+  )?.includes("B08PQ2KWHS"),
+  true,
+);
+assert.equal(pickRetailerHref("https://slickdeals.net/click?trd=Get+Deal+at+Ashley&sdtid=19957455", sdPage)?.includes("/click"), true);
+assert.equal(pickRetailerHref("https://sldc.net/go?url=https://www.amazon.com/dp/B08PQ2KWHS", sdPage)?.includes("B08PQ2KWHS"), true);
+assert.equal(
+  pickRetailerHref(
+    "https://click.linksynergy.com/deeplink?murl=https%3A%2F%2Fwww.ashleyfurniture.com%2Fp%2Fstorrow_sofa%2F2920338.html",
+    sdPage,
+  )?.includes("ashleyfurniture.com/p/storrow_sofa/2920338.html"),
+  true,
+);
+assert.equal(pickRetailerHref("https://9to5toys.com/2026/09/01/iphone-17-pro-deals/", sdPage), null);
+
+const sdHtml = readFileSync(new URL("../src/lib/__fixtures__/slickdeals-thread.html", import.meta.url), "utf8");
+const sdFound = extractRetailerCandidates(sdHtml, sdPage);
+assert.equal(sdFound.length, 1);
+assert.equal(sdFound[0].currentPrice, 399);
+assert.equal(sdFound[0].listPrice, null);
+assert.equal(/deal score|frontpage deal|slickdeals/i.test(sdFound[0].title), false);
+assert.equal(sdFound[0].title.includes("Ashley Storrow Sofa"), true);
+assert.equal(sdFound[0].href.includes("/click"), true);
+assert.equal(sdFound.some((item) => /B0SIDEBAR01|B0COMMENT01|B0COMMNOTES/.test(item.href)), false);
+
+const sdDeals = dealsFromRoundupCandidates(sdFound);
+assert.equal(sdDeals.length, 1);
+const sofa = sdDeals[0]!;
+assert.equal(sofa.currentPrice, 399);
+assert.equal(sofa.listPrice, null);
+assert.equal(sofa.promoCode ?? null, null);
+const sofaWriteup = [
+  sofa.title,
+  sofa.bullets.join(" "),
+  sofa.stackingSteps.map((step) => `${step.title} ${step.detail}`).join(" "),
+  sofa.summary ?? "",
+].join("\n");
+assert.equal(looksClonedWriteup(sofaWriteup), false);
+assert.equal(/deal score|frontpage deal|slickdeals/i.test(sofaWriteup), false);
+assert.equal(/doorstep|white glove/i.test(sofaWriteup), true);
+assert.equal(/Ashley Furniture has Storrow Sofa for \$399/i.test(sofaWriteup), false);
+assert.equal(sofa.bullets.length, 3);
+assert.equal(sofa.stackingSteps.length >= 3, true);
+
+const mechanics = extractDealMechanics(
+  "Ashley Furniture has Storrow Sofa for $399. Doorstep delivery is free, or White Glove Delivery adds $79.99",
+);
+assert.equal(mechanics.freeShipping, true);
+assert.equal(mechanics.extraDeliveryFee?.amount, 79.99);
+assert.equal(mechanics.promoCode, null);
+
+const codeMechanics = extractDealMechanics("Use code SAVE25 at checkout. Clip the coupon. Subscribe & Save. Costco membership. Limit 2 per customer.");
+assert.equal(codeMechanics.promoCode, "SAVE25");
+assert.equal(codeMechanics.clipCoupon, true);
+assert.equal(codeMechanics.subscribeSave, true);
+assert.equal(Boolean(codeMechanics.membership), true);
+assert.equal(codeMechanics.quantityLimit?.includes("2"), true);
+
+const nestedSd = `
+<div class="dealDetailsMainBlock"><h1 class="dealDetailsMainBlock__dealTitle">Instant Pot $49</h1></div>
+<div class="dealDetailsTab__bodyHtml">
+  Instant Pot Duo for $49 after clipping the coupon. Use code POT49.
+  <a href="https://slickdeals.net/click?url=https%3A%2F%2Fwww.amazon.com%2Fdp%2FB08PQ2KWHS%3Ftag%3Dslickdeals-20">See Deal</a>
+</div>
+<div id="commentsBox"><a href="https://www.amazon.com/dp/B0COMMENT01">nope</a></div>
+`;
+const nestedFound = extractRetailerCandidates(nestedSd, sdPage);
+assert.equal(nestedFound.length, 1);
+assert.equal(nestedFound[0].href.includes("B08PQ2KWHS"), true);
+assert.equal(nestedFound[0].currentPrice, 49);
+assert.equal(nestedFound.some((item) => item.href.includes("B0COMMENT01")), false);
+const nestedDeals = dealsFromRoundupCandidates(nestedFound);
+assert.equal(nestedDeals[0]?.merchant, "amazon");
+assert.equal(nestedDeals[0]?.affiliateUrl.includes("tag=actuallydea07-20"), true);
+assert.equal(nestedDeals[0]?.affiliateUrl.includes("slickdeals-20"), false);
+assert.equal(nestedDeals[0]?.promoCode, "POT49");
+assert.equal(nestedDeals[0]?.clipCoupon, true);
+assert.equal(looksClonedWriteup(nestedDeals[0]?.bullets.join(" ") ?? ""), false);
 
 console.log("parser verification passed");

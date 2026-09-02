@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const parsed = await ingestDealPaste(body.url);
     const first = parsed.deals[0];
     const hit = first
-      ? await findDeskDuplicate(first.merchant, first.merchantProductId, null)
+      ? await findDeskDuplicate(first.merchant, first.merchantProductId, first.promoCode ?? null)
       : null;
     const deskDuplicate = hit ? { slug: hit.slug, title: hit.title } : null;
     return NextResponse.json({ ...parsed, deskDuplicate });

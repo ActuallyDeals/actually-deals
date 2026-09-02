@@ -496,10 +496,23 @@ export function AdminPublisher({
         scrapeNote: parsed.scrapeNote ?? "",
         pricesBlocked: Boolean(parsed.pricesBlocked) && parsed.currentPrice == null,
         category: parsed.merchant === "amazon" ? "amazon-finds" : current.category,
-        clipCoupon: inferred.clipCoupon || current.clipCoupon,
-        subscribeSave: inferred.subscribeSave || current.subscribeSave,
+        promoCode: parsed.promoCode?.trim() || current.promoCode,
+        clipCoupon: Boolean(parsed.clipCoupon) || inferred.clipCoupon || current.clipCoupon,
+        subscribeSave: Boolean(parsed.subscribeSave) || inferred.subscribeSave || current.subscribeSave,
+        summary: parsed.summary?.trim() && !sameListing ? parsed.summary : current.summary,
       };
-      return applyStackToDraft(next);
+      const stacked = applyStackToDraft(next);
+      if (parsed.bullets?.length === 3) stacked.bullets = parsed.bullets;
+      if (parsed.stackingSteps?.length) {
+        const boxes = staffWriteupBoxes({
+          summary: parsed.summary ?? stacked.summary,
+          stackingSteps: parsed.stackingSteps,
+        });
+        if (boxes.why) stacked.summary = boxes.why;
+        if (boxes.stack) stacked.stackNote = boxes.stack;
+        if (boxes.verify) stacked.verifyNote = boxes.verify;
+      }
+      return stacked;
     });
     setImageTier(resolved.imageTier);
   }
@@ -553,7 +566,7 @@ export function AdminPublisher({
               [...queued, ...live],
               parsed.merchant,
               parsed.merchantProductId,
-              draft.promoCode,
+              parsed.promoCode ?? draft.promoCode,
               editingSlug,
             );
       if (duplicate) {
@@ -635,11 +648,11 @@ export function AdminPublisher({
       imageUrl: parsed.imageUrl,
       currentPrice: parsed.currentPrice,
       listPrice: parsed.listPrice,
-      promoCode: null,
+      promoCode: parsed.promoCode ?? null,
       bullets: parsed.bullets?.length === 3 ? parsed.bullets : ["", "", ""],
-      stackingSteps: [],
+      stackingSteps: parsed.stackingSteps ?? [],
       socialPost: null,
-      summary: null,
+      summary: parsed.summary ?? null,
       status: "draft",
       queueStage: "incoming",
     };
