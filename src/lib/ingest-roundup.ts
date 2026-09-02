@@ -18,7 +18,9 @@ import { detectMerchant, extractMerchantProductId } from "@/lib/merchants";
 import { isDirectRetailerListing, isRetailerShortUrl } from "@/lib/outbound";
 import {
   canonicalSourceUrl,
+  extractFromHtml,
   fetchHtml,
+  looksLikeChallengeCopy,
   parseDealUrl,
   ParseDealError,
 } from "@/lib/parse-deal";
@@ -683,6 +685,115 @@ async function unwrapRedirects(rawUrl: string): Promise<string> {
   return current;
 }
 
+
+function hasUsableTitle(title: string | null | undefined): boolean {
+  const trimmed = title?.trim() ?? "";
+  if (!trimmed) return false;
+  return !/^untitled(?:\s+deal)?$/i.test(trimmed);
+}
+
+function listingHostLabel(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (isDealForumUrl(url) || isClickWrapper(url)) return null;
+  return hostnameOf(url);
+}
+
+function buildIngestNotes(input: {
+  unwrapFailed: boolean;
+  currentPrice: number | null;
+  image: ReturnType<typeof resolveDealImage>;
+  merchant: Merchant;
+  productId: string | null;
+  sourceUrl?: string | null;
+}): string | null {
+  const host = input.merchant === "other" ? listingHostLabel(input.sourceUrl) : null;
+  const imageMissing =
+    input.image.imageTier === "placeholder" && !cdnImageFor(input.merchant, input.productId);
+  const imageNote = imageMissing
+    ? host
+      ? `Paste the product Image URL from ${host}. Do not generate a lifestyle shot.`
+      : "Paste the product Image URL from the listing. Do not generate a lifestyle shot."
+    : null;
+  const notes = [
+    input.unwrapFailed ? "Short link did not unwrap. Confirm the retailer URL before Ready." : null,
+    input.currentPrice == null ? "Paste the live price from the listing. Do not invent one." : null,
+    imageNote,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return notes || null;
+}
+
+/** True when a roundup card still needs a retailer listing fetch for a product photo. */
+export function shouldFetchRetailerListing(input: {
+  merchant: Merchant;
+  productId: string | null;
+  url: string;
+  scrapedImageUrl?: string | null;
+}): boolean {
+  if (cdnImageFor(input.merchant, input.productId)) return false;
+  if (input.scrapedImageUrl) return false;
+  if (isDealForumUrl(input.url) || isClickWrapper(input.url)) return false;
+  try {
+    const path = new URL(input.url).pathname.split("/").filter(Boolean);
+    if (path.length === 0) return false;
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Attach og:image / JSON-LD photo (and a missing price/title) from already-fetched listing HTML.
+ * Does not rewrite OP mechanics, summary, or bullets. Does not overwrite an existing price or title.
+ */
+export function hydrateDealFromListingHtml(deal: ParsedDeal, html: string): ParsedDeal {
+  const extracted = extractFromHtml(html, deal.merchant);
+  const alreadyHasPhoto =
+    Boolean(cdnImageFor(deal.merchant, deal.merchantProductId)) ||
+    Boolean(deal.scrapedImageUrl) ||
+    deal.imageTier === "cdn" ||
+    deal.imageTier === "scraped";
+  const image = alreadyHasPhoto
+    ? {
+        imageUrl: deal.imageUrl,
+        imageTier: deal.imageTier,
+        cdnUrl: cdnImageFor(deal.merchant, deal.merchantProductId),
+      }
+    : resolveDealImage({
+        scrapedImageUrl: extracted.scrapedImageUrl,
+        merchant: deal.merchant,
+        merchantProductId: deal.merchantProductId,
+      });
+  const currentPrice = deal.currentPrice ?? extracted.currentPrice;
+  const listingTitle =
+    extracted.title && !looksLikeChallengeCopy(extracted.title)
+      ? extracted.title.replace(/\s+/g, " ").trim().slice(0, 140)
+      : null;
+  const title = hasUsableTitle(deal.title) ? deal.title : listingTitle || deal.title;
+  const unwrapFailed = /Short link did not unwrap/i.test(deal.scrapeNote ?? "");
+  const scrapedImageUrl = alreadyHasPhoto
+    ? deal.scrapedImageUrl
+    : (extracted.scrapedImageUrl ?? (image.imageTier === "cdn" ? image.imageUrl : null));
+  return {
+    ...deal,
+    title,
+    currentPrice,
+    scrapedImageUrl,
+    imageUrl: image.imageUrl,
+    imageTier: image.imageTier,
+    pricesBlocked: currentPrice == null,
+    scrapeNote: buildIngestNotes({
+      unwrapFailed,
+      currentPrice,
+      image,
+      merchant: deal.merchant,
+      productId: deal.merchantProductId,
+      sourceUrl: deal.sourceUrl,
+    }),
+  };
+}
+
 function parsedFromCandidate(
   candidate: RoundupCandidate,
   unwrapped: string,
@@ -762,15 +873,6 @@ function parsedFromCandidate(
       summary: null,
     });
   }
-  const notes = [
-    unwrapFailed ? "Short link did not unwrap. Confirm the retailer URL before Ready." : null,
-    currentPrice == null ? "Paste the live price from the listing. Do not invent one." : null,
-    image.imageTier === "placeholder" && !cdnImageFor(merchant, productId)
-      ? "Paste the product Image URL from the listing. Do not generate a lifestyle shot."
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
   return {
     merchant,
     merchantProductId: productId,
@@ -786,7 +888,14 @@ function parsedFromCandidate(
     stackingSteps,
     socialPost: "",
     pricesBlocked: currentPrice == null,
-    scrapeNote: notes || null,
+    scrapeNote: buildIngestNotes({
+      unwrapFailed,
+      currentPrice,
+      image,
+      merchant,
+      productId,
+      sourceUrl,
+    }),
     promoCode,
     clipCoupon: mechanics.clipCoupon,
     subscribeSave: mechanics.subscribeSave,
@@ -811,15 +920,6 @@ function finishParsed(input: {
   subscribeSave: boolean;
   summary: string | null;
 }): ParsedDeal {
-  const notes = [
-    input.unwrapFailed ? "Short link did not unwrap. Confirm the retailer URL before Ready." : null,
-    input.currentPrice == null ? "Paste the live price from the listing. Do not invent one." : null,
-    input.image.imageTier === "placeholder" && !cdnImageFor(input.merchant, input.productId)
-      ? "Paste the product Image URL from the listing. Do not generate a lifestyle shot."
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
   return {
     merchant: input.merchant,
     merchantProductId: input.productId,
@@ -835,7 +935,14 @@ function finishParsed(input: {
     stackingSteps: input.stackingSteps,
     socialPost: "",
     pricesBlocked: input.currentPrice == null,
-    scrapeNote: notes || null,
+    scrapeNote: buildIngestNotes({
+      unwrapFailed: input.unwrapFailed,
+      currentPrice: input.currentPrice,
+      image: input.image,
+      merchant: input.merchant,
+      productId: input.productId,
+      sourceUrl: input.sourceUrl,
+    }),
     promoCode: input.promoCode,
     clipCoupon: input.clipCoupon,
     subscribeSave: input.subscribeSave,
@@ -913,6 +1020,18 @@ async function ingestThirdPartyPage(rawUrl: string): Promise<IngestResult> {
     const key = listingKey(deal.sourceUrl, deal.merchant, deal.merchantProductId);
     if (seen.has(key)) continue;
     seen.add(key);
+    if (
+      shouldFetchRetailerListing({
+        merchant: deal.merchant,
+        productId: deal.merchantProductId,
+        url: deal.sourceUrl,
+        scrapedImageUrl: deal.scrapedImageUrl,
+      })
+    ) {
+      const listing = await fetchHtml(deal.sourceUrl);
+      deals.push(listing ? hydrateDealFromListingHtml(deal, listing.html) : deal);
+      continue;
+    }
     deals.push(deal);
   }
 

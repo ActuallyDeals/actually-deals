@@ -151,7 +151,7 @@ function largestDynamicImage(raw: string | undefined): string | null {
   }
 }
 
-function extractFromHtml(html: string, merchant: Merchant): {
+export function extractFromHtml(html: string, merchant: Merchant): {
   title: string | null;
   currentPrice: number | null;
   listPrice: number | null;
@@ -339,7 +339,7 @@ function displaySlugTitle(slug: string): string {
   return titleCaseProductName(raw);
 }
 
-function looksLikeChallengeCopy(value: string | null | undefined): boolean {
+export function looksLikeChallengeCopy(value: string | null | undefined): boolean {
   if (!value) return false;
   return /robot or human|are you a robot|access denied|pardon our|just a moment|attention required|px-captcha|blocked/i.test(
     value,

@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import {
   dealsFromRoundupCandidates,
   extractRetailerCandidates,
+  hydrateDealFromListingHtml,
   ingestDealPaste,
   isClickWrapper,
   isDealBlogArticleUrl,
@@ -13,9 +14,10 @@ import {
   isSlickdealsThreadUrl,
   pickRetailerHref,
   resolvePasteTarget,
+  shouldFetchRetailerListing,
 } from "../src/lib/ingest-roundup.ts";
 import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
-import { canonicalSourceUrl, titleFromProductUrl } from "../src/lib/parse-deal.ts";
+import { canonicalSourceUrl, extractFromHtml, titleFromProductUrl } from "../src/lib/parse-deal.ts";
 import { giftCardFaceValue } from "../src/lib/pricing.ts";
 import { isCouponOnlyDeal, isDirectRetailerListing, isRetailerShortUrl } from "../src/lib/outbound.ts";
 import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
@@ -596,5 +598,150 @@ assert.equal(/single deal article|retailer product URL/i.test(hub.scrapeNote ?? 
 const hubBlob = await ingestDealPaste("staff dump https://thefreebieguy.com/food-deals-freebies/");
 assert.equal(hubBlob.deals.length, 0);
 assert.equal(/single deal article|retailer product URL/i.test(hubBlob.scrapeNote ?? ""), true);
+
+
+assert.equal(
+  shouldFetchRetailerListing({
+    merchant: "amazon",
+    productId: "B08PQ2KWHS",
+    url: "https://www.amazon.com/dp/B08PQ2KWHS",
+  }),
+  false,
+);
+assert.equal(
+  shouldFetchRetailerListing({
+    merchant: "other",
+    productId: null,
+    url: "https://www.ashleyfurniture.com/p/storrow_sofa/2920338.html",
+  }),
+  true,
+);
+assert.equal(
+  shouldFetchRetailerListing({
+    merchant: "other",
+    productId: null,
+    url: "https://www.ashleyfurniture.com/p/storrow_sofa/2920338.html",
+    scrapedImageUrl: "https://cdn.ashleyfurniture.com/images/storrow-sofa.jpg",
+  }),
+  false,
+);
+assert.equal(
+  shouldFetchRetailerListing({
+    merchant: "other",
+    productId: null,
+    url: "https://slickdeals.net/click?trd=Get+Deal+at+Ashley",
+  }),
+  false,
+);
+
+const ashleyListingHtml = readFileSync(new URL("../src/lib/__fixtures__/ashley-listing.html", import.meta.url), "utf8");
+const ashleyExtracted = extractFromHtml(ashleyListingHtml, "other");
+assert.equal(ashleyExtracted.scrapedImageUrl, "https://cdn.ashleyfurniture.com/images/storrow-sofa.jpg");
+assert.equal(ashleyExtracted.currentPrice, 449);
+assert.equal(ashleyExtracted.title?.includes("Storrow Sofa"), true);
+
+assert.equal(sofa.imageTier, "placeholder");
+const sofaHydrated = hydrateDealFromListingHtml(sofa, ashleyListingHtml);
+assert.equal(sofaHydrated.imageUrl, "https://cdn.ashleyfurniture.com/images/storrow-sofa.jpg");
+assert.equal(sofaHydrated.scrapedImageUrl, "https://cdn.ashleyfurniture.com/images/storrow-sofa.jpg");
+assert.equal(sofaHydrated.imageTier, "scraped");
+assert.equal(sofaHydrated.currentPrice, 399);
+assert.equal(sofaHydrated.listPrice, null);
+assert.equal(sofaHydrated.title.includes("Ashley Storrow Sofa"), true);
+assert.equal(/biggest living room|0% APR|financing this weekend|collection packages/i.test(sofaHydrated.title), false);
+assert.equal(/biggest living room|0% APR|financing this weekend|collection packages/i.test(sofaHydrated.summary ?? ""), false);
+assert.equal(/biggest living room|0% APR|financing this weekend|collection packages/i.test(sofaHydrated.bullets.join(" ")), false);
+assert.equal(/doorstep|white glove/i.test(sofaHydrated.bullets.join(" ") + sofaHydrated.stackingSteps.map((step) => step.detail).join(" ")), true);
+assert.equal(isBrandedPlaceholder(sofaHydrated.imageUrl), false);
+assert.equal(/Paste the product Image URL/i.test(sofaHydrated.scrapeNote ?? ""), false);
+
+const noPriceHydrated = hydrateDealFromListingHtml(
+  dealsFromRoundupCandidates([
+    {
+      href: "https://www.ashleyfurniture.com/p/storrow_sofa/2920338.html",
+      title: "Ashley Storrow Sofa",
+      currentPrice: null,
+      listPrice: null,
+    },
+  ])[0]!,
+  ashleyListingHtml,
+);
+assert.equal(noPriceHydrated.currentPrice, 449);
+assert.equal(noPriceHydrated.pricesBlocked, false);
+assert.equal(noPriceHydrated.title.includes("Ashley Storrow Sofa"), true);
+assert.equal(noPriceHydrated.listPrice, null);
+
+const untitledHydrated = hydrateDealFromListingHtml(
+  dealsFromRoundupCandidates([
+    {
+      href: "https://www.ashleyfurniture.com/p/storrow_sofa/2920338.html",
+      title: "Untitled deal",
+      currentPrice: 399,
+      listPrice: null,
+    },
+  ])[0]!,
+  ashleyListingHtml,
+);
+assert.equal(untitledHydrated.title, "Storrow Sofa");
+assert.equal(untitledHydrated.currentPrice, 399);
+
+const amazonHydrated = hydrateDealFromListingHtml(silver!, ashleyListingHtml);
+assert.equal(amazonHydrated.imageTier, "cdn");
+assert.equal(amazonHydrated.imageUrl.includes("B0G467WG1C"), true);
+assert.equal(amazonHydrated.imageUrl.includes("storrow-sofa"), false);
+
+const originalFetch = globalThis.fetch;
+let ashleyListingFetches = 0;
+let amazonListingFetches = 0;
+globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (/ashleyfurniture\.com/i.test(url)) {
+    ashleyListingFetches += 1;
+    return new Response(ashleyListingHtml, { status: 200, headers: { "content-type": "text/html" } });
+  }
+  if (/slickdeals\.net\/click|sldc\.net|sdclick\./i.test(url)) {
+    return new Response(null, {
+      status: 302,
+      headers: { location: "https://www.ashleyfurniture.com/p/storrow_sofa/2920338.html" },
+    });
+  }
+  if (/slickdeals\.net/i.test(url)) {
+    return new Response(sdHtml, { status: 200, headers: { "content-type": "text/html" } });
+  }
+  if (/9to5toys\.com/i.test(url)) {
+    return new Response(html, { status: 200, headers: { "content-type": "text/html" } });
+  }
+  if (/amzn\.to/i.test(url)) {
+    return new Response(null, {
+      status: 302,
+      headers: { location: "https://www.amazon.com/dp/B0G467WG1C" },
+    });
+  }
+  if (/amazon\.com/i.test(url)) {
+    amazonListingFetches += 1;
+    return new Response("<html><body>nope</body></html>", { status: 200, headers: { "content-type": "text/html" } });
+  }
+  return originalFetch(input, init);
+}) as typeof fetch;
+try {
+  const pasted = await ingestDealPaste("https://slickdeals.net/f/19957455-ashley-storrow-sofa-399");
+  assert.equal(pasted.deals.length, 1);
+  assert.equal(pasted.deals[0]?.imageUrl, "https://cdn.ashleyfurniture.com/images/storrow-sofa.jpg");
+  assert.equal(pasted.deals[0]?.scrapedImageUrl, "https://cdn.ashleyfurniture.com/images/storrow-sofa.jpg");
+  assert.equal(pasted.deals[0]?.imageTier, "scraped");
+  assert.equal(pasted.deals[0]?.currentPrice, 399);
+  assert.equal(pasted.deals[0]?.title.includes("Ashley Storrow Sofa"), true);
+  assert.equal(/biggest living room|0% APR|collection packages/i.test(pasted.deals[0]?.bullets.join(" ") ?? ""), false);
+  assert.equal(ashleyListingFetches, 1);
+
+  const toys = await ingestDealPaste("https://9to5toys.com/2026/09/01/iphone-17-pro-deals/");
+  assert.equal(toys.deals.length >= 1, true);
+  assert.equal(amazonListingFetches, 0);
+  const toysSilver = toys.deals.find((deal) => deal.merchantProductId === "B0G467WG1C");
+  assert.equal(toysSilver?.imageTier, "cdn");
+  assert.equal(toysSilver?.affiliateUrl.includes("tag=actuallydea07-20"), true);
+} finally {
+  globalThis.fetch = originalFetch;
+}
 
 console.log("parser verification passed");
