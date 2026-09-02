@@ -29,7 +29,7 @@ const UNWRAP_TIMEOUT_MS = 5000;
 const ROUNDUP_CAP = 12;
 /** Classes/ids proven on 9to5Toys recirc: sidebar cards, related guides, newsletter, author gear, in-post media-text promos. */
 const SKIP_CLOSEST =
-  "nav, footer, header, aside, .sidebar, .author-gear, .author-gear-items, .author-box, .author-bio, .author-bio-container, .related, .related-guides, .related-guide, .recommended, .visitor-promo, .featured-items, .ninetofive-newsletter-subscribe, .wp-block-media-text, #comments, .comments, #commentsBox, .commentsBox, .commentsSectionV2, .leaveACommentV2, .dealDetailsPage__card--commentsSection, .dealDetailsSidebar, .sidebarDeals, .communityWiki, #communityNotesTab, .aboutThePosterTab, .recommendedDealAlerts, .youMightLike, .comment, .reply";
+  "nav, footer, header, aside, .sidebar, .author-gear, .author-gear-items, .author-box, .author-bio, .author-bio-container, .related, .related-guides, .related-guide, .related-posts, .related-post, .jp-relatedposts, .recommended, .visitor-promo, .featured-items, .ninetofive-newsletter-subscribe, .newsletter, .newsletter-signup, .wp-block-media-text, #comments, .comments, .comments-area, #respond, #commentsBox, .commentsBox, .commentsSectionV2, .leaveACommentV2, .dealDetailsPage__card--commentsSection, .dealDetailsSidebar, .sidebarDeals, .communityWiki, #communityNotesTab, .aboutThePosterTab, .recommendedDealAlerts, .youMightLike, .comment, .reply";
 
 const NESTED_KEYS = [
   "u",
@@ -142,6 +142,146 @@ function hostnameOf(href: string): string | null {
   }
 }
 
+const HTTP_URL_RE = /https?:\/\/[^\s<>"')\]]+/gi;
+const NON_DEAL_HOSTS = [
+  "twitter.com",
+  "x.com",
+  "t.co",
+  "facebook.com",
+  "fb.com",
+  "instagram.com",
+  "youtube.com",
+  "youtu.be",
+  "tiktok.com",
+];
+const HUB_FIRST_SEGMENTS = new Set([
+  "food-deals-freebies",
+  "amazon-deals",
+  "target-deals",
+  "walmart-deals",
+  "costco-deals",
+  "deals",
+  "freebies",
+  "coupons",
+  "coupon",
+  "category",
+  "tag",
+  "author",
+  "page",
+  "store",
+  "stores",
+  "shop",
+  "about",
+  "contact",
+]);
+const HUB_REFUSE_NOTE =
+  "That looks like a deal hub / index, not a single deal. Paste a single deal article or a retailer product URL.";
+
+function stripTrailingUrlJunk(raw: string): string {
+  return raw.replace(/[.,;:!?]+$/g, "").replace(/[)\]]+$/g, "");
+}
+
+/** http(s) URLs inside a Slack/tweet/sentence paste. Does not invent links. */
+export function extractHttpUrls(text: string): string[] {
+  const found: string[] = [];
+  const seen = new Set<string>();
+  const re = new RegExp(HTTP_URL_RE.source, HTTP_URL_RE.flags);
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text))) {
+    const candidate = stripTrailingUrlJunk(match[0]);
+    try {
+      const href = new URL(candidate).toString();
+      if (seen.has(href)) continue;
+      seen.add(href);
+      found.push(href);
+    } catch {
+      // ignore
+    }
+  }
+  return found;
+}
+
+function isNonDealHost(href: string): boolean {
+  const host = hostnameOf(href);
+  if (!host) return false;
+  return NON_DEAL_HOSTS.some((part) => host === part || host.endsWith(`.${part}`));
+}
+
+function isHip2SaveHost(href: string): boolean {
+  const host = hostnameOf(href);
+  return host === "hip2save.com" || Boolean(host?.endsWith(".hip2save.com"));
+}
+
+function isFreebieGuyHost(href: string): boolean {
+  const host = hostnameOf(href);
+  return host === "thefreebieguy.com" || Boolean(host?.endsWith(".thefreebieguy.com"));
+}
+
+/** Category/index dumps (Freebie Guy hubs, Hip2Save restaurant index). Not a single deal article. */
+export function isDealHubUrl(href: string): boolean {
+  try {
+    const url = new URL(href);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const hip = host === "hip2save.com" || host.endsWith(".hip2save.com");
+    const freebie = host === "thefreebieguy.com" || host.endsWith(".thefreebieguy.com");
+    if (!hip && !freebie) return false;
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length === 0) return true;
+    const first = parts[0].toLowerCase();
+    if (HUB_FIRST_SEGMENTS.has(first)) return true;
+    if (hip && parts.length === 1 && (first === "tips" || first === "deals" || first === "coupons")) return true;
+    if (hip && /restaurant-deals/i.test(url.pathname)) return true;
+    if (freebie && parts.length === 1 && /(?:deals|freebies|coupons)$/i.test(first)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function isDealBlogArticleUrl(href: string): boolean {
+  if (isDealHubUrl(href)) return false;
+  return isHip2SaveHost(href) || isFreebieGuyHost(href);
+}
+
+function isRetailerProductUrl(href: string): boolean {
+  const merchant = detectMerchant(href);
+  if (isDirectRetailerListing(href, merchant)) return true;
+  return Boolean(retailerProductHref(href));
+}
+
+function looksLikeStandaloneUrl(raw: string): boolean {
+  if (!raw || /\s/.test(raw)) return false;
+  try {
+    const url = new URL(withHttps(raw));
+    return ["http:", "https:"].includes(url.protocol) && url.hostname.includes(".");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pick the deal URL from a paste box. Prefers a retailer product URL over a blog URL.
+ * Returns a hub URL as-is so ingest can refuse it with a scrapeNote.
+ */
+export function resolvePasteTarget(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (looksLikeStandaloneUrl(trimmed)) return withHttps(trimmed);
+
+  const urls = extractHttpUrls(trimmed);
+  if (urls.length === 0) return null;
+  const usable = urls.filter((href) => !isNonDealHost(href));
+  const pool = usable.length ? usable : urls;
+
+  const retailer = pool.find((href) => isRetailerProductUrl(href));
+  if (retailer) return retailer;
+
+  const article = pool.find((href) => !isDealHubUrl(href) && !isNonDealHost(href));
+  if (article) return article;
+
+  return pool[0] ?? null;
+}
+
 /** slickdeals.net thread pages only — not daily/money blogs, not click hosts. */
 export function isSlickdealsThreadUrl(href: string): boolean {
   try {
@@ -240,6 +380,9 @@ function titleFromItemText(text: string): string {
     .replace(/[–—-]\s*(new )?all-time lows?.*$/gi, " ")
     .replace(/\b(new )?all-time lows?\b/gi, " ")
     .replace(/\b9to5(?:toys|mac|google)?\b/gi, " ")
+    .replace(/\bhip2save\b/gi, " ")
+    .replace(/\b(?:the\s+)?freebie guy\b/gi, " ")
+    .replace(/\s*[|\-–]\s*(Hip2Save|The Freebie Guy|Slickdeals|9to5(?:Toys|Mac|Google)?)\s*$/i, " ")
     .replace(/\b(deal score|frontpage deal|slickdeals)\b.*$/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -283,7 +426,7 @@ function contentRoot($: cheerio.CheerioAPI, pageUrl?: string) {
     const sd = slickdealsContentRoots($);
     if (sd[0]) return sd[0];
   }
-  for (const sel of [".post-content", ".entry-content", ".post-body", "article", "main"]) {
+  for (const sel of [".td-post-content", ".post-content", ".entry-content", ".post-body", "article", "main"]) {
     const node = $(sel).first();
     if (node.length) return node;
   }
@@ -368,6 +511,7 @@ function candidateFromAnchor(
     title,
     currentPrice: priced.current,
     listPrice: priced.list,
+    sourceText: blob || undefined,
   };
 }
 
@@ -432,6 +576,44 @@ function overlaySlickdealsThread(
   }));
 }
 
+function articleBodyText($: cheerio.CheerioAPI, root: ReturnType<cheerio.CheerioAPI>): string {
+  const clone = root.clone();
+  clone.find(SKIP_CLOSEST).remove();
+  return clone.text().replace(/\s+/g, " ").trim();
+}
+
+function articleTitle($: cheerio.CheerioAPI): string {
+  return (
+    cleanThreadTitle($("h1.entry-title").first().text()) ||
+    cleanThreadTitle($("h1").first().text()) ||
+    cleanThreadTitle($('meta[property="og:title"]').attr("content") ?? "") ||
+    cleanThreadTitle($("title").first().text())
+  );
+}
+
+function overlayDealBlogArticle(
+  candidates: RoundupCandidate[],
+  $: cheerio.CheerioAPI,
+  pageUrl: string,
+): RoundupCandidate[] {
+  if (!isDealBlogArticleUrl(pageUrl) || candidates.length === 0) return candidates;
+  const bodyText = articleBodyText($, contentRoot($, pageUrl));
+  const title = articleTitle($);
+  const priced = pricesFromText(`${title} ${bodyText}`);
+  const single = candidates.length === 1;
+  return candidates.map((candidate) => {
+    const current = candidate.currentPrice ?? (single ? priced.current : null);
+    const list = candidate.listPrice ?? (single ? priced.list : null);
+    return {
+      ...candidate,
+      title: single && title ? title : candidate.title,
+      currentPrice: current,
+      listPrice: list != null && current != null && list > current ? list : null,
+      sourceText: single ? bodyText || candidate.sourceText : candidate.sourceText,
+    };
+  });
+}
+
 /** Sync extract of retailer product links + on-page prices. Does not invent prices. */
 export function extractRetailerCandidates(html: string, pageUrl: string): RoundupCandidate[] {
   const $ = cheerio.load(html);
@@ -446,7 +628,7 @@ export function extractRetailerCandidates(html: string, pageUrl: string): Roundu
     }
   }
   const sliced = merged.slice(0, ROUNDUP_CAP);
-  return overlaySlickdealsThread(sliced, $, pageUrl);
+  return overlayDealBlogArticle(overlaySlickdealsThread(sliced, $, pageUrl), $, pageUrl);
 }
 
 function firstProductUrl(href: string): string | null {
@@ -763,16 +945,28 @@ function looksLikeDirectListing(rawUrl: string): boolean {
   }
 }
 
-/** Paste handler for /admin: retailer listing or third-party deal page. */
+/** Paste handler for /admin: mixed text, retailer listing, or third-party deal page. */
 export async function ingestDealPaste(rawUrl: string): Promise<IngestResult> {
   const trimmed = rawUrl.trim();
   if (!trimmed) throw new ParseDealError("Paste a product URL to parse.");
-  if (isSlickdealsThreadUrl(withHttps(trimmed))) {
-    return ingestThirdPartyPage(trimmed);
+  const target = resolvePasteTarget(trimmed);
+  if (!target) throw new ParseDealError("That does not look like a valid URL.");
+  if (isNonDealHost(target) && !isRetailerProductUrl(target)) {
+    return {
+      deals: [],
+      scrapeNote:
+        "Paste a retailer product URL or a single deal article. Tweets and social posts cannot be scraped.",
+    };
   }
-  if (looksLikeDirectListing(trimmed)) {
-    const parsed = await parseDealUrl(trimmed);
+  if (isDealHubUrl(target)) {
+    return { deals: [], scrapeNote: HUB_REFUSE_NOTE };
+  }
+  if (isSlickdealsThreadUrl(target)) {
+    return ingestThirdPartyPage(target);
+  }
+  if (looksLikeDirectListing(target)) {
+    const parsed = await parseDealUrl(target);
     return { deals: [parsed], scrapeNote: parsed.scrapeNote };
   }
-  return ingestThirdPartyPage(trimmed);
+  return ingestThirdPartyPage(target);
 }

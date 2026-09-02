@@ -223,7 +223,8 @@ function payloadFromDeal(deal: Deal, status: Deal["status"]): PublishDealInput {
 }
 
 function looksLikeUrl(value: string): boolean {
-  const candidate = withHttps(value);
+  if (/https?:\/\/\S/i.test(value)) return true;
+  const candidate = withHttps(value.trim());
   if (!candidate) return false;
   try {
     const url = new URL(candidate);
@@ -518,7 +519,7 @@ export function AdminPublisher({
   }
 
   async function runParse(raw: string) {
-    const target = withHttps(raw);
+    const target = raw.trim();
     if (!looksLikeUrl(target)) return;
     setParsing(true);
     setError(null);
@@ -1163,7 +1164,7 @@ export function AdminPublisher({
           }}
         >
           <div className="space-y-2">
-            <Label htmlFor="desk-url">URL</Label>
+            <Label htmlFor="desk-url">Paste</Label>
             <Input
               id="desk-url"
               ref={urlRef}
@@ -1180,7 +1181,7 @@ export function AdminPublisher({
               onBlur={() => {
                 if (looksLikeUrl(url) && !parsedUrls.current.has(url.trim())) void runParse(url);
               }}
-              placeholder="Paste a product, deal-page, or coupon URL"
+              placeholder="Paste a product URL, deal article, tweet, or coupon"
               className="h-12 text-base font-medium"
             />
             <div className="flex items-center justify-between gap-3">

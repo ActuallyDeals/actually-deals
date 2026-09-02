@@ -6,9 +6,13 @@ import { readFileSync } from "node:fs";
 import {
   dealsFromRoundupCandidates,
   extractRetailerCandidates,
+  ingestDealPaste,
   isClickWrapper,
+  isDealBlogArticleUrl,
+  isDealHubUrl,
   isSlickdealsThreadUrl,
   pickRetailerHref,
+  resolvePasteTarget,
 } from "../src/lib/ingest-roundup.ts";
 import { detectMerchant, extractMerchantProductId } from "../src/lib/merchants.ts";
 import { canonicalSourceUrl, titleFromProductUrl } from "../src/lib/parse-deal.ts";
@@ -522,5 +526,75 @@ assert.equal(nestedDeals[0]?.affiliateUrl.includes("slickdeals-20"), false);
 assert.equal(nestedDeals[0]?.promoCode, "POT49");
 assert.equal(nestedDeals[0]?.clipCoupon, true);
 assert.equal(looksClonedWriteup(nestedDeals[0]?.bullets.join(" ") ?? ""), false);
+
+const slackBlob =
+  "Mike — saw this in Slack: check https://hip2save.com/tips/tide-pods-amazon/ and https://www.amazon.com/dp/B08PQ2KWHS?tag=other-20 thanks";
+assert.equal(resolvePasteTarget(slackBlob)?.includes("B08PQ2KWHS"), true);
+assert.equal(resolvePasteTarget("fire deal https://www.amazon.com/dp/B08PQ2KWHS going fast")?.includes("B08PQ2KWHS"), true);
+assert.equal(
+  resolvePasteTarget("Worth a look: https://hip2save.com/tips/tide-pods-amazon/")?.includes("hip2save.com/tips/tide-pods-amazon"),
+  true,
+);
+assert.equal(
+  resolvePasteTarget("https://x.com/foo/status/1 check https://www.amazon.com/dp/B08PQ2KWHS")?.includes("B08PQ2KWHS"),
+  true,
+);
+assert.equal(resolvePasteTarget("https://www.amazon.com/dp/B08PQ2KWHS"), "https://www.amazon.com/dp/B08PQ2KWHS");
+
+assert.equal(isDealHubUrl("https://thefreebieguy.com/food-deals-freebies/"), true);
+assert.equal(isDealHubUrl("https://thefreebieguy.com/hersheys-chocolate-sale/"), false);
+assert.equal(isDealHubUrl("https://hip2save.com/tips/current-restaurant-deals-and-discounts/"), true);
+assert.equal(isDealHubUrl("https://hip2save.com/tips/"), true);
+assert.equal(isDealHubUrl("https://hip2save.com/tips/tide-pods-amazon/"), false);
+assert.equal(isDealBlogArticleUrl("https://hip2save.com/tips/tide-pods-amazon/"), true);
+assert.equal(isDealBlogArticleUrl("https://thefreebieguy.com/food-deals-freebies/"), false);
+assert.equal(isDealBlogArticleUrl("https://thefreebieguy.com/hersheys-chocolate-sale/"), true);
+
+const hipPage = "https://hip2save.com/tips/tide-pods-amazon/";
+const hipHtml = `
+<article class="post">
+  <h1 class="entry-title">Tide Pods 96-count $12 at Amazon (Reg. $24) | Hip2Save</h1>
+  <div class="entry-content">
+    <p>Clip the coupon then use code TIDE12. Subscribe &amp; Save. Tide Pods 96-count for $12 (Reg. $24).</p>
+    <p><a href="https://www.amazon.com/dp/B08PQ2KWHS?tag=hip2save-20">Get it at Amazon</a></p>
+  </div>
+</article>
+<div id="comments"><a href="https://www.amazon.com/dp/B0COMMENT01">comment leftover</a></div>
+<div class="related-posts"><ul><li><a href="https://www.amazon.com/dp/B0RELATED01">related leftover</a></li></ul></div>
+<div class="newsletter"><a href="https://www.amazon.com/dp/B0NEWS01">newsletter leftover</a></div>
+`;
+const hipFound = extractRetailerCandidates(hipHtml, hipPage);
+assert.equal(hipFound.length, 1);
+assert.equal(hipFound[0].href.includes("B08PQ2KWHS"), true);
+assert.equal(hipFound[0].currentPrice, 12);
+assert.equal(hipFound[0].listPrice, 24);
+assert.equal(/hip2save/i.test(hipFound[0].title), false);
+assert.equal(hipFound[0].title.includes("Tide Pods"), true);
+assert.equal(hipFound.some((item) => /B0COMMENT01|B0RELATED01|B0NEWS01/.test(item.href)), false);
+const hipDeals = dealsFromRoundupCandidates(hipFound);
+assert.equal(hipDeals.length, 1);
+assert.equal(hipDeals[0]?.merchant, "amazon");
+assert.equal(hipDeals[0]?.affiliateUrl.includes("tag=actuallydea07-20"), true);
+assert.equal(hipDeals[0]?.affiliateUrl.includes("hip2save-20"), false);
+assert.equal(hipDeals[0]?.promoCode, "TIDE12");
+assert.equal(hipDeals[0]?.clipCoupon, true);
+assert.equal(hipDeals[0]?.subscribeSave, true);
+const hipWriteup = [
+  hipDeals[0]?.title,
+  hipDeals[0]?.bullets.join(" "),
+  hipDeals[0]?.stackingSteps.map((step) => `${step.title} ${step.detail}`).join(" "),
+  hipDeals[0]?.summary ?? "",
+].join("\n");
+assert.equal(looksClonedWriteup(hipWriteup), false);
+assert.equal(/hip2save|freebie guy|deal score|frontpage deal|slickdeals/i.test(hipWriteup), false);
+assert.equal(/Clip the coupon then use code TIDE12\. Subscribe & Save\. Tide Pods 96-count for \$12/i.test(hipWriteup), false);
+assert.equal(/TIDE12|clip/i.test(hipWriteup), true);
+
+const hub = await ingestDealPaste("https://thefreebieguy.com/food-deals-freebies/");
+assert.equal(hub.deals.length, 0);
+assert.equal(/single deal article|retailer product URL/i.test(hub.scrapeNote ?? ""), true);
+const hubBlob = await ingestDealPaste("staff dump https://thefreebieguy.com/food-deals-freebies/");
+assert.equal(hubBlob.deals.length, 0);
+assert.equal(/single deal article|retailer product URL/i.test(hubBlob.scrapeNote ?? ""), true);
 
 console.log("parser verification passed");
