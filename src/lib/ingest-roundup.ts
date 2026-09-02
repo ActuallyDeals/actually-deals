@@ -31,7 +31,7 @@ const UNWRAP_TIMEOUT_MS = 5000;
 const ROUNDUP_CAP = 12;
 /** Classes/ids proven on 9to5Toys recirc: sidebar cards, related guides, newsletter, author gear, in-post media-text promos. */
 const SKIP_CLOSEST =
-  "nav, footer, header, aside, .sidebar, .author-gear, .author-gear-items, .author-box, .author-bio, .author-bio-container, .related, .related-guides, .related-guide, .related-posts, .related-post, .jp-relatedposts, .recommended, .visitor-promo, .featured-items, .ninetofive-newsletter-subscribe, .newsletter, .newsletter-signup, .wp-block-media-text, #comments, .comments, .comments-area, #respond, #commentsBox, .commentsBox, .commentsSectionV2, .leaveACommentV2, .dealDetailsPage__card--commentsSection, .dealDetailsSidebar, .sidebarDeals, .communityWiki, #communityNotesTab, .aboutThePosterTab, .recommendedDealAlerts, .youMightLike, .comment, .reply";
+  "nav, footer, header, aside, .sidebar, .author-gear, .author-gear-items, .author-box, .author-bio, .author-bio-container, .related, .related-guides, .related-guide, .related-posts, .related-post, .jp-relatedposts, .vce-related-box, .recommended, .visitor-promo, .featured-items, .ninetofive-newsletter-subscribe, .newsletter, .newsletter-signup, .wp-block-media-text, #comments, .comments, .comments-area, #respond, #commentsBox, .commentsBox, .commentsSectionV2, .leaveACommentV2, .dealDetailsPage__card--commentsSection, #wpdcom, .wpd-thread-list, .wpd-comment, .dealDetailsSidebar, .sidebarDeals, .communityWiki, #communityNotesTab, .aboutThePosterTab, .recommendedDealAlerts, .youMightLike, .comment, .reply";
 
 const NESTED_KEYS = [
   "u",
@@ -60,6 +60,7 @@ export interface RoundupCandidate {
   currentPrice: number | null;
   listPrice: number | null;
   sourceText?: string;
+  promoCode?: string | null;
 }
 
 export interface IngestResult {
@@ -219,6 +220,26 @@ function isFreebieGuyHost(href: string): boolean {
   return host === "thefreebieguy.com" || Boolean(host?.endsWith(".thefreebieguy.com"));
 }
 
+function isDoctorOfCreditHost(href: string): boolean {
+  const host = hostnameOf(href);
+  return host === "doctorofcredit.com" || Boolean(host?.endsWith(".doctorofcredit.com"));
+}
+
+/** Third-party deal blogs/roundups — never the retailer listing. */
+function isDealSiteHost(href: string): boolean {
+  const host = hostnameOf(href);
+  if (!host) return false;
+  if (isHip2SaveHost(href) || isFreebieGuyHost(href) || isDoctorOfCreditHost(href)) return true;
+  return (
+    host === "9to5toys.com" ||
+    host.endsWith(".9to5toys.com") ||
+    host === "9to5mac.com" ||
+    host.endsWith(".9to5mac.com") ||
+    host === "9to5google.com" ||
+    host.endsWith(".9to5google.com")
+  );
+}
+
 /** Category/index dumps (Freebie Guy hubs, Hip2Save restaurant index). Not a single deal article. */
 export function isDealHubUrl(href: string): boolean {
   try {
@@ -226,7 +247,8 @@ export function isDealHubUrl(href: string): boolean {
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
     const hip = host === "hip2save.com" || host.endsWith(".hip2save.com");
     const freebie = host === "thefreebieguy.com" || host.endsWith(".thefreebieguy.com");
-    if (!hip && !freebie) return false;
+    const doc = host === "doctorofcredit.com" || host.endsWith(".doctorofcredit.com");
+    if (!hip && !freebie && !doc) return false;
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts.length === 0) return true;
     const first = parts[0].toLowerCase();
@@ -242,7 +264,7 @@ export function isDealHubUrl(href: string): boolean {
 
 export function isDealBlogArticleUrl(href: string): boolean {
   if (isDealHubUrl(href)) return false;
-  return isHip2SaveHost(href) || isFreebieGuyHost(href);
+  return isHip2SaveHost(href) || isFreebieGuyHost(href) || isDoctorOfCreditHost(href);
 }
 
 function isRetailerProductUrl(href: string): boolean {
@@ -329,9 +351,12 @@ export function pickRetailerHref(raw: string, pageUrl: string): string | null {
     const hit = retailerProductHref(candidate);
     if (hit) return hit;
   }
+  const allowOtherStores = isDealBlogArticleUrl(pageUrl);
   for (const candidate of nested) {
-    if (candidate === absolute) continue;
+    if (candidate === absolute && !allowOtherStores) continue;
     if (isDealForumUrl(candidate) || isClickWrapper(candidate)) continue;
+    if (isDealSiteHost(candidate) || isNonDealHost(candidate)) continue;
+    if (hostnameOf(candidate) === hostnameOf(pageUrl)) continue;
     try {
       const path = new URL(candidate).pathname.split("/").filter(Boolean);
       if (path.length >= 2) return candidate;
@@ -384,7 +409,9 @@ function titleFromItemText(text: string): string {
     .replace(/\b9to5(?:toys|mac|google)?\b/gi, " ")
     .replace(/\bhip2save\b/gi, " ")
     .replace(/\b(?:the\s+)?freebie guy\b/gi, " ")
-    .replace(/\s*[|\-–]\s*(Hip2Save|The Freebie Guy|Slickdeals|9to5(?:Toys|Mac|Google)?)\s*$/i, " ")
+    .replace(/\bdoctorofcredit\b/gi, " ")
+    .replace(/\b(?:the\s+)?doctor of credit\b/gi, " ")
+    .replace(/\s*[|\-–]\s*(Hip2Save|The Freebie Guy|Slickdeals|Doctor of Credit|9to5(?:Toys|Mac|Google)?)\s*$/i, " ")
     .replace(/\b(deal score|frontpage deal|slickdeals)\b.*$/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -578,10 +605,68 @@ function overlaySlickdealsThread(
   }));
 }
 
+function stripDealBlogChromeSections($: cheerio.CheerioAPI, root: ReturnType<cheerio.CheerioAPI>) {
+  const heading = root
+    .find("h2, h3")
+    .filter((_, el) => {
+      const t = $(el).text().replace(/\s+/g, " ").trim();
+      return /^our verdict$/i.test(t) || /^post history$/i.test(t);
+    })
+    .first();
+  if (heading.length) {
+    heading.nextAll().remove();
+    heading.remove();
+  }
+  root.find("p").each((_, el) => {
+    const t = $(el).text().replace(/\s+/g, " ").trim();
+    if (/^post history:?$/i.test(t)) {
+      $(el).nextAll().remove();
+      $(el).remove();
+      return false;
+    }
+  });
+}
+
 function articleBodyText($: cheerio.CheerioAPI, root: ReturnType<cheerio.CheerioAPI>): string {
   const clone = root.clone();
   clone.find(SKIP_CLOSEST).remove();
+  stripDealBlogChromeSections($, clone);
   return clone.text().replace(/\s+/g, " ").trim();
+}
+
+const PROMO_CODE_TOKEN =
+  /(?:promo(?:tion)?\s+code|coupon\s+code|code)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{2,})\b/i;
+const UPDATE_PROMO_CODE =
+  /Update\s+\d{1,2}\/\d{1,2}\/\d{2,4}\s*:[\s\S]{0,200}?(?:promo(?:tion)?\s+code|coupon\s+code|code)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{2,})\b/i;
+
+function normalizePromoCode(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const code = raw.toUpperCase();
+  if (/^(ZIP|AREA|POSTAL|HTML|HTTP|HTTPS|DEAL)$/.test(code)) return null;
+  return code;
+}
+
+/**
+ * Live promo code only: first dated "Update M/D/YY: … promo code X" at the top
+ * of the article, else the code in the current title. Ignores The Offer / Post history.
+ */
+export function livePromoCodeFromDealBlog(title: string, body: string): string | null {
+  const cut = body.split(/\b(?:Our Verdict|Post history)\b/i)[0] ?? body;
+  const updateCode = normalizePromoCode(cut.match(UPDATE_PROMO_CODE)?.[1]);
+  if (updateCode) return updateCode;
+  return normalizePromoCode(title.match(PROMO_CODE_TOKEN)?.[1]);
+}
+
+function freeWithCodePrice(title: string, body: string, promoCode: string | null): number | null {
+  if (!promoCode) return null;
+  const cut = `${title} ${body.split(/\b(?:Our Verdict|Post history)\b/i)[0] ?? body}`;
+  if (
+    /\bfree\b.{0,60}(?:promo(?:tion)?\s+code|coupon\s+code|code)\b/i.test(cut) ||
+    /(?:promo(?:tion)?\s+code|coupon\s+code|code)\b.{0,60}\bfree\b/i.test(cut)
+  ) {
+    return 0;
+  }
+  return null;
 }
 
 function articleTitle($: cheerio.CheerioAPI): string {
@@ -602,16 +687,21 @@ function overlayDealBlogArticle(
   const bodyText = articleBodyText($, contentRoot($, pageUrl));
   const title = articleTitle($);
   const priced = pricesFromText(`${title} ${bodyText}`);
+  const liveCode = livePromoCodeFromDealBlog(title, bodyText);
   const single = candidates.length === 1;
   return candidates.map((candidate) => {
-    const current = candidate.currentPrice ?? (single ? priced.current : null);
+    let current = candidate.currentPrice ?? (single ? priced.current : null);
     const list = candidate.listPrice ?? (single ? priced.list : null);
+    if (single && current == null) {
+      current = freeWithCodePrice(title, bodyText, liveCode);
+    }
     return {
       ...candidate,
       title: single && title ? title : candidate.title,
       currentPrice: current,
       listPrice: list != null && current != null && list > current ? list : null,
       sourceText: single ? bodyText || candidate.sourceText : candidate.sourceText,
+      promoCode: single ? liveCode : candidate.promoCode,
     };
   });
 }
@@ -821,6 +911,7 @@ function parsedFromCandidate(
     listPrice = face;
   }
   const mechanics = extractDealMechanics(candidate.sourceText ?? "");
+  if (candidate.promoCode) mechanics.promoCode = candidate.promoCode;
   const promoCode = mechanics.promoCode;
   const extra = hasExtraMechanics(mechanics);
   const bullets = extra

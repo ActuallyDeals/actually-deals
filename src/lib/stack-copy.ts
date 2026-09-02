@@ -40,6 +40,8 @@ export function looksClonedWriteup(text: string): boolean {
     /slickdeals/i.test(blob) ||
     /hip2save/i.test(blob) ||
     /(?:the\s+)?freebie guy/i.test(blob) ||
+    /doctorofcredit/i.test(blob) ||
+    /doctor of credit/i.test(blob) ||
     /add to (?:your )?next delivery/i.test(blob) ||
     /amazon\.com\/dp/i.test(blob)
   );

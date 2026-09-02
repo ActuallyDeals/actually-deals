@@ -12,6 +12,7 @@ import {
   isDealBlogArticleUrl,
   isDealHubUrl,
   isSlickdealsThreadUrl,
+  livePromoCodeFromDealBlog,
   pickRetailerHref,
   resolvePasteTarget,
   shouldFetchRetailerListing,
@@ -29,6 +30,7 @@ assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ
 assert.equal(extractMerchantProductId(withHttps("amazon.com/dp/B08PQ2KWHS"), "amazon"), "B08PQ2KWHS");
 
 assert.equal(storeLabelFromUrl("ashleyfurniture.com"), "Ashley Furniture");
+assert.equal(storeLabelFromUrl("https://photo.walgreens.com/store/sample-set-of-6-premium"), "Walgreens");
 assert.equal(storeLabelFromUrl("www.wayfair.com"), "Wayfair");
 assert.equal(storeLabelFromUrl("shop.example.co.uk"), "Example");
 assert.equal(storeLabelFromUrl(""), "Store");
@@ -589,6 +591,34 @@ assert.equal(isDealHubUrl("https://hip2save.com/tips/tide-pods-amazon/"), false)
 assert.equal(isDealBlogArticleUrl("https://hip2save.com/tips/tide-pods-amazon/"), true);
 assert.equal(isDealBlogArticleUrl("https://thefreebieguy.com/food-deals-freebies/"), false);
 assert.equal(isDealBlogArticleUrl("https://thefreebieguy.com/hersheys-chocolate-sale/"), true);
+assert.equal(
+  isDealBlogArticleUrl(
+    "https://www.doctorofcredit.com/walgreens-set-of-6-customized-5x7-premium-photo-cards-free-with-promo-code/",
+  ),
+  true,
+);
+assert.equal(
+  isDealHubUrl(
+    "https://www.doctorofcredit.com/walgreens-set-of-6-customized-5x7-premium-photo-cards-free-with-promo-code/",
+  ),
+  false,
+);
+assert.equal(isDealHubUrl("https://www.doctorofcredit.com/"), true);
+assert.equal(isDealHubUrl("https://www.doctorofcredit.com/category/deals/"), true);
+assert.equal(isDealBlogArticleUrl("https://www.doctorofcredit.com/"), false);
+assert.equal(looksClonedWriteup("Per Doctor of Credit this is live"), true);
+assert.equal(looksClonedWriteup("See doctorofcredit.com for the original"), true);
+assert.equal(
+  livePromoCodeFromDealBlog(
+    "Walgreens photo cards Free With Promo Code PREM6",
+    "The Offer: promo code SIXFREE. Update 9/1/26: Deal is back with promo code PREM6. Update 8/11/26: promo code FREEMIUM. Our Verdict: skip. Post history: promo code PREMCARDS",
+  ),
+  "PREM6",
+);
+assert.equal(
+  livePromoCodeFromDealBlog("Tide Pods 96-count $12 at Amazon", "Clip the coupon then use code TIDE12. Subscribe & Save."),
+  null,
+);
 
 const hipPage = "https://hip2save.com/tips/tide-pods-amazon/";
 const hipHtml = `
@@ -637,6 +667,57 @@ const hubBlob = await ingestDealPaste("staff dump https://thefreebieguy.com/food
 assert.equal(hubBlob.deals.length, 0);
 assert.equal(/single deal article|retailer product URL/i.test(hubBlob.scrapeNote ?? ""), true);
 
+const docPage =
+  "https://www.doctorofcredit.com/walgreens-set-of-6-customized-5x7-premium-photo-cards-free-with-promo-code/";
+const docHtml = readFileSync(new URL("../src/lib/__fixtures__/doctorofcredit-walgreens.html", import.meta.url), "utf8");
+const docFound = extractRetailerCandidates(docHtml, docPage);
+assert.equal(docFound.length, 1);
+assert.equal(docFound[0].href.includes("photo.walgreens.com/store/sample-set-of-6-premium"), true);
+assert.equal(docFound[0].promoCode, "PREM6");
+assert.equal(docFound[0].listPrice, null);
+assert.equal(docFound[0].currentPrice, 0);
+assert.equal(/doctor of credit|hip2save|slickdeals/i.test(docFound[0].title), false);
+assert.equal(/photo cards/i.test(docFound[0].title), true);
+assert.equal(docFound.some((item) => /B0COMMENT01|B0RELATED01/.test(item.href)), false);
+const retiredCodes = /SIXFRE|FREEMIUM|\b6FREE\b|SEND6CARDS|SENDTHESE|57CARDS|6cards|PREMCARDS/i;
+assert.equal(retiredCodes.test(docFound[0].promoCode ?? ""), false);
+const docDeals = dealsFromRoundupCandidates(docFound);
+assert.equal(docDeals.length, 1);
+const cards = docDeals[0]!;
+assert.equal(cards.merchant, "other");
+assert.equal(cards.sourceUrl.includes("photo.walgreens.com/store/sample-set-of-6-premium"), true);
+assert.equal(cards.promoCode, "PREM6");
+assert.equal(cards.listPrice, null);
+assert.equal(cards.currentPrice, 0);
+assert.equal(cards.pricesBlocked, false);
+const cardsWriteup = [
+  cards.title,
+  cards.bullets.join(" "),
+  cards.stackingSteps.map((step) => `${step.title} ${step.detail}`).join(" "),
+  cards.summary ?? "",
+].join("\n");
+assert.equal(looksClonedWriteup(cardsWriteup), false);
+assert.equal(retiredCodes.test(cardsWriteup), false);
+assert.equal(/doctor of credit|doctorofcredit|our verdict|hat tip/i.test(cardsWriteup), false);
+assert.equal(/PREM6/i.test(cardsWriteup), true);
+assert.equal(/Walgreens/.test(cards.bullets.join(" ")), true);
+assert.equal(/Enter PREM6|Apply code PREM6|Use code PREM6/i.test(cardsWriteup), true);
+const cardsSocialInput = {
+  title: cards.title,
+  merchant: cards.merchant,
+  currentPrice: cards.currentPrice,
+  promoCode: cards.promoCode,
+  sourceUrl: cards.sourceUrl,
+  why: cards.summary,
+};
+const cardsSocial = buildSocialPost(cardsSocialInput);
+assert.equal(retiredCodes.test(cardsSocial), false);
+assert.equal(
+  retiredCodes.test(
+    [cardsSocial, buildInstagramCaption(cardsSocialInput), buildFacebookPost(cardsSocialInput)].join("\n"),
+  ),
+  false,
+);
 
 assert.equal(
   shouldFetchRetailerListing({
@@ -783,6 +864,49 @@ try {
   assert.equal(toysSilver?.affiliateUrl.includes("tag=actuallydea07-20"), true);
 } finally {
   globalThis.fetch = originalFetch;
+}
+
+const walgreensListingHtml = `<html><head>
+<meta property="og:title" content="Set of 6 Premium Photo Cards">
+<meta property="og:image" content="https://photo.walgreens.com/images/sample-set-of-6-premium.jpg">
+</head><body><h1>Set of 6 Premium Photo Cards</h1></body></html>`;
+const originalDocFetch = globalThis.fetch;
+let walgreensListingFetches = 0;
+globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (/doctorofcredit\.com/i.test(url)) {
+    return new Response(docHtml, { status: 200, headers: { "content-type": "text/html" } });
+  }
+  if (/photo\.walgreens\.com/i.test(url)) {
+    walgreensListingFetches += 1;
+    if (init?.method === "GET" && init.redirect === "manual") {
+      return new Response(null, { status: 200 });
+    }
+    return new Response(walgreensListingHtml, { status: 200, headers: { "content-type": "text/html" } });
+  }
+  return originalDocFetch(input, init);
+}) as typeof fetch;
+try {
+  const docPaste = await ingestDealPaste(docPage);
+  assert.equal(docPaste.deals.length, 1);
+  assert.equal(docPaste.deals[0]?.promoCode, "PREM6");
+  assert.equal(docPaste.deals[0]?.sourceUrl.includes("photo.walgreens.com/store/sample-set-of-6-premium"), true);
+  assert.equal(docPaste.deals[0]?.merchant, "other");
+  assert.equal(docPaste.deals[0]?.listPrice ?? null, null);
+  assert.equal(docPaste.deals[0]?.currentPrice, 0);
+  assert.equal(docPaste.deals[0]?.imageUrl, "https://photo.walgreens.com/images/sample-set-of-6-premium.jpg");
+  assert.equal(docPaste.deals[0]?.imageTier, "scraped");
+  const deskWriteup = [
+    docPaste.deals[0]?.title,
+    docPaste.deals[0]?.bullets.join(" "),
+    docPaste.deals[0]?.stackingSteps.map((step) => `${step.title} ${step.detail}`).join(" "),
+    docPaste.deals[0]?.summary ?? "",
+  ].join("\n");
+  assert.equal(retiredCodes.test(deskWriteup), false);
+  assert.equal(/PREM6/.test(deskWriteup), true);
+  assert.equal(walgreensListingFetches >= 1, true);
+} finally {
+  globalThis.fetch = originalDocFetch;
 }
 
 console.log("parser verification passed");
