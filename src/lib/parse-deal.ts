@@ -380,7 +380,10 @@ export function titleFromProductUrl(
       merchant === "ebay" ||
       merchant === "kohls" ||
       merchant === "dicks" ||
-      merchant === "office-depot"
+      merchant === "office-depot" ||
+      merchant === "booking" ||
+      merchant === "expedia" ||
+      merchant === "hotels"
     ) {
       const skip = new Set(["p", "-", "itm", "product", "products", "a"]);
       for (let i = parts.length - 1; i >= 0; i -= 1) {
@@ -427,6 +430,9 @@ function fallbackTitle(merchant: Merchant, productId: string | null, url: string
       kohls: `Kohl's item ${productId}`,
       dicks: `Dick's item ${productId}`,
       "office-depot": `Office Depot item ${productId}`,
+      booking: `Booking.com listing ${productId}`,
+      expedia: `Expedia listing ${productId}`,
+      hotels: `Hotels.com listing ${productId}`,
       uber: `Uber item ${productId}`,
       doordash: `DoorDash item ${productId}`,
       grubhub: `Grubhub item ${productId}`,
@@ -489,7 +495,10 @@ export function canonicalSourceUrl(merchant: Merchant, productId: string | null,
     }
     return `https://www.dickssportinggoods.com/p/${productId}`;
   }
-  if (merchant === "office-depot" && productId) {
+  if (merchant === "office-depot" ||
+      merchant === "booking" ||
+      merchant === "expedia" ||
+      merchant === "hotels" && productId) {
     return `https://www.officedepot.com/a/products/${productId}/`;
   }
   return cleanedUrl;

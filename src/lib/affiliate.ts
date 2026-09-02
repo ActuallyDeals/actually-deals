@@ -166,6 +166,9 @@ export function affiliateTags() {
     cjPid: envValue("AFFILIATE_CJ_PID") || CJ_PUBLISHER_PID,
     dicksAid: envValue("AFFILIATE_CJ_DICKS_AID") || CJ_DICKS_ADVERTISER_ID,
     officeDepotAid: envValue("AFFILIATE_CJ_OFFICE_DEPOT_AID"),
+    bookingAid: envValue("AFFILIATE_CJ_BOOKING_AID"),
+    expediaAid: envValue("AFFILIATE_CJ_EXPEDIA_AID"),
+    hotelsAid: envValue("AFFILIATE_CJ_HOTELS_AID"),
     ebayCampaignId: envValue("AFFILIATE_EBAY_CAMPAIGN_ID"),
     rakutenSid: envValue("AFFILIATE_RAKUTEN_SID") || RAKUTEN_SID,
     neweggMid: envValue("AFFILIATE_NEWEGG_MID"),
@@ -205,7 +208,14 @@ export function attachAffiliate(
         return tags.cjPid && tags.officeDepotAid
           ? cjDeepLink(tags.cjPid, tags.officeDepotAid, dest)
           : dest;
+      case "booking":
+        return tags.cjPid && tags.bookingAid ? cjDeepLink(tags.cjPid, tags.bookingAid, dest) : dest;
+      case "expedia":
+        return tags.cjPid && tags.expediaAid ? cjDeepLink(tags.cjPid, tags.expediaAid, dest) : dest;
+      case "hotels":
+        return tags.cjPid && tags.hotelsAid ? cjDeepLink(tags.cjPid, tags.hotelsAid, dest) : dest;
       case "ebay": {
+
         if (!tags.ebayCampaignId) return dest;
         url.searchParams.set("mkcid", "1");
         url.searchParams.set("mkrid", "711-53200-19255-0");

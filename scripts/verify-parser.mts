@@ -479,7 +479,93 @@ if (prevOfficeAid === undefined) delete process.env.AFFILIATE_CJ_OFFICE_DEPOT_AI
 else process.env.AFFILIATE_CJ_OFFICE_DEPOT_AID = prevOfficeAid;
 assert.equal(attachAffiliate("https://www.costco.com/p/-/foo/4000233859", "costco").includes("goto."), false);
 
-for (const merchant of ["newegg", "ebay", "kohls", "dicks", "office-depot", "uber", "doordash", "grubhub"] as const) {
+const booking =
+  "https://www.booking.com/hotel/us/the-plaza.html?aid=123&utm_source=x";
+assert.equal(detectMerchant(booking), "booking");
+assert.equal(detectMerchant("https://www.booking.co.uk/hotel/gb/the-savoy.html"), "booking");
+assert.equal(detectMerchant("https://booking.de/hotel/de/adlon.html"), "booking");
+assert.equal(detectMerchant("https://www.kayak.com/hotels/nyc"), "other");
+assert.equal(detectMerchant("https://www.airbnb.com/rooms/123"), "other");
+assert.equal(detectMerchant("https://www.southwest.com/flights"), "other");
+assert.equal(merchantLabel("booking"), "Booking.com");
+assert.equal(extractMerchantProductId(booking, "booking"), "us/the-plaza");
+assert.equal(
+  extractMerchantProductId("https://www.booking.com/hotel/us/the-plaza.html?hotel_id=654321", "booking"),
+  "654321",
+);
+assert.equal(extractMerchantProductId("https://www.booking.com/", "booking"), null);
+const prevBookingAid = process.env.AFFILIATE_CJ_BOOKING_AID;
+delete process.env.AFFILIATE_CJ_BOOKING_AID;
+assert.equal(attachAffiliate(booking, "booking").includes("anrdoezrs.net"), false);
+assert.equal(attachAffiliate(booking, "booking").includes("utm_source"), false);
+assert.equal(attachAffiliate(booking, "booking").includes("booking.com/hotel/us/the-plaza"), true);
+process.env.AFFILIATE_CJ_PID = "8059705";
+process.env.AFFILIATE_CJ_BOOKING_AID = "2223334";
+const bookingClean = cleanTrackingParams(booking);
+const bookingWrapped = new URL(attachAffiliate(booking, "booking"));
+assert.equal(bookingWrapped.hostname, "www.anrdoezrs.net");
+assert.equal(bookingWrapped.pathname, "/click-8059705-2223334");
+assert.equal(bookingWrapped.searchParams.get("url"), bookingClean);
+assert.equal(bookingWrapped.searchParams.get("url")?.includes("utm_source"), false);
+assert.equal([...bookingWrapped.searchParams.keys()].join(","), "url");
+if (prevBookingAid === undefined) delete process.env.AFFILIATE_CJ_BOOKING_AID;
+else process.env.AFFILIATE_CJ_BOOKING_AID = prevBookingAid;
+
+const expedia =
+  "https://www.expedia.com/New-York-Hotels-The-Plaza.h123456.Hotel-Information?utm_medium=email";
+assert.equal(detectMerchant(expedia), "expedia");
+assert.equal(detectMerchant("https://www.expedia.co.uk/London-Hotels-The-Savoy.h123456.Hotel-Information"), "expedia");
+assert.equal(detectMerchant("https://expedia.ca/ho123456/"), "expedia");
+assert.equal(merchantLabel("expedia"), "Expedia");
+assert.equal(extractMerchantProductId(expedia, "expedia"), "123456");
+assert.equal(extractMerchantProductId("https://www.expedia.com/ho987654/", "expedia"), "987654");
+assert.equal(
+  extractMerchantProductId("https://www.expedia.com/Hotel-Search?destination=NYC", "expedia"),
+  null,
+);
+const prevExpediaAid = process.env.AFFILIATE_CJ_EXPEDIA_AID;
+delete process.env.AFFILIATE_CJ_EXPEDIA_AID;
+assert.equal(attachAffiliate(expedia, "expedia").includes("anrdoezrs.net"), false);
+assert.equal(attachAffiliate(expedia, "expedia").includes("utm_medium"), false);
+assert.equal(attachAffiliate(expedia, "expedia").includes("expedia.com"), true);
+process.env.AFFILIATE_CJ_PID = "8059705";
+process.env.AFFILIATE_CJ_EXPEDIA_AID = "3334445";
+const expediaWrapped = new URL(attachAffiliate(expedia, "expedia"));
+assert.equal(expediaWrapped.hostname, "www.anrdoezrs.net");
+assert.equal(expediaWrapped.pathname, "/click-8059705-3334445");
+assert.equal(expediaWrapped.searchParams.get("url")?.includes("expedia.com"), true);
+assert.equal(expediaWrapped.searchParams.get("url")?.includes("utm_medium"), false);
+if (prevExpediaAid === undefined) delete process.env.AFFILIATE_CJ_EXPEDIA_AID;
+else process.env.AFFILIATE_CJ_EXPEDIA_AID = prevExpediaAid;
+
+const hotels =
+  "https://www.hotels.com/ho246810/?utm_campaign=x";
+assert.equal(detectMerchant(hotels), "hotels");
+assert.equal(detectMerchant("https://hotels.com/ho246810/"), "hotels");
+assert.equal(detectMerchant("https://www.choicehotels.com/tx123"), "other");
+assert.equal(merchantLabel("hotels"), "Hotels.com");
+assert.equal(extractMerchantProductId(hotels, "hotels"), "246810");
+assert.equal(
+  extractMerchantProductId("https://www.hotels.com/Hotel-Name.h246810.Hotel-Information", "hotels"),
+  "246810",
+);
+const prevHotelsAid = process.env.AFFILIATE_CJ_HOTELS_AID;
+delete process.env.AFFILIATE_CJ_HOTELS_AID;
+assert.equal(attachAffiliate(hotels, "hotels").includes("anrdoezrs.net"), false);
+assert.equal(attachAffiliate(hotels, "hotels").includes("utm_campaign"), false);
+assert.equal(attachAffiliate(hotels, "hotels").includes("hotels.com"), true);
+process.env.AFFILIATE_CJ_PID = "8059705";
+process.env.AFFILIATE_CJ_HOTELS_AID = "4445556";
+const hotelsWrapped = new URL(attachAffiliate(hotels, "hotels"));
+assert.equal(hotelsWrapped.hostname, "www.anrdoezrs.net");
+assert.equal(hotelsWrapped.pathname, "/click-8059705-4445556");
+assert.equal(hotelsWrapped.searchParams.get("url")?.includes("hotels.com"), true);
+assert.equal(hotelsWrapped.searchParams.get("url")?.includes("utm_campaign"), false);
+if (prevHotelsAid === undefined) delete process.env.AFFILIATE_CJ_HOTELS_AID;
+else process.env.AFFILIATE_CJ_HOTELS_AID = prevHotelsAid;
+
+
+for (const merchant of ["newegg", "ebay", "kohls", "dicks", "office-depot", "booking", "expedia", "hotels", "uber", "doordash", "grubhub"] as const) {
   const image = resolveDealImage({ scrapedImageUrl: null, merchant, merchantProductId: "x" });
   assert.equal(image.imageTier, "placeholder");
   assert.equal(image.imageUrl, "/placeholders/other.svg");

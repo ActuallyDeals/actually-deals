@@ -74,6 +74,24 @@ export const MERCHANT_PROFILES: Record<Merchant, MerchantProfile> = {
     hostMatches: ["officedepot.", "officemax."],
     color: "#CC0000",
   },
+  booking: {
+    id: "booking",
+    label: "Booking.com",
+    hostMatches: ["booking."],
+    color: "#003580",
+  },
+  expedia: {
+    id: "expedia",
+    label: "Expedia",
+    hostMatches: ["expedia."],
+    color: "#F5C518",
+  },
+  hotels: {
+    id: "hotels",
+    label: "Hotels.com",
+    hostMatches: ["hotels.com"],
+    color: "#D32F2F",
+  },
   uber: {
     id: "uber",
     label: "Uber",
@@ -100,6 +118,16 @@ export const MERCHANT_PROFILES: Record<Merchant, MerchantProfile> = {
   },
 };
 
+function hostnameMatches(host: string, part: string): boolean {
+  const h = host.toLowerCase();
+  const p = part.toLowerCase();
+  if (!p) return false;
+  // "amazon." / "booking." — SLD plus dot, including ccTLDs.
+  if (p.endsWith(".")) return h.includes(p);
+  // Full host like "hotels.com" / "uber.com" — suffix only, not choicehotels.com.
+  return h === p || h.endsWith(`.${p}`);
+}
+
 export function detectMerchant(rawUrl: string): Merchant {
   let host = "";
   try {
@@ -110,7 +138,7 @@ export function detectMerchant(rawUrl: string): Merchant {
 
   for (const profile of Object.values(MERCHANT_PROFILES)) {
     if (profile.id === "other") continue;
-    if (profile.hostMatches.some((part) => host.includes(part))) {
+    if (profile.hostMatches.some((part) => hostnameMatches(host, part))) {
       return profile.id;
     }
   }
@@ -271,6 +299,32 @@ export function extractMerchantProductId(rawUrl: string, merchant: Merchant): st
         const fromQuery = url.searchParams.get("productId") ?? url.searchParams.get("sku");
         const candidate = fromPath ?? fromQuery;
         if (candidate && /^\d+$/.test(candidate)) return candidate;
+        return null;
+      }
+      case "booking": {
+        const fromQuery = url.searchParams.get("hotel_id");
+        if (fromQuery && /^\d{4,}$/.test(fromQuery)) return fromQuery;
+        const hotelPath = path.match(/\/hotel\/([a-z]{2})\/([^/]+?)(?:\.html)?(?:\/|$)/i);
+        if (hotelPath) {
+          const slug = hotelPath[2].replace(/\.html$/i, "");
+          if (slug && !/^\d+$/.test(slug) && slug.length >= 2) {
+            return `${hotelPath[1].toLowerCase()}/${slug.toLowerCase()}`;
+          }
+        }
+        return null;
+      }
+      case "expedia":
+      case "hotels": {
+        const fromPath =
+          path.match(/\.h(\d{3,})(?:\.|\/|$)/i)?.[1] ??
+          path.match(/\/ho(\d{3,})(?:\/|$)/i)?.[1] ??
+          path.match(/\/(?:hotel\/info|h)(?:\/|\.)(\d{3,})(?:\/|$)/i)?.[2];
+        const fromQuery =
+          url.searchParams.get("hotelId") ??
+          url.searchParams.get("selectedHotelId") ??
+          url.searchParams.get("hotel_id");
+        const candidate = fromPath ?? fromQuery;
+        if (candidate && /^\d{3,}$/.test(candidate)) return candidate;
         return null;
       }
       case "uber":
