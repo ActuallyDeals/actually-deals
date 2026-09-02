@@ -345,6 +345,10 @@ assert.equal(couponFb.includes("Uber Eats 20% off first order at Uber w/ code EA
 assert.equal(couponFb.includes(GENERIC_AFFILIATE_DISCLOSURE), true);
 assert.equal(couponFb.includes("ActuallyDeals"), true);
 assert.equal(couponFb.includes("Get Deal"), false);
+assert.equal(
+  couponFb.indexOf("actuallydeals.com/deal/uber-eats-20") < couponFb.indexOf(GENERIC_AFFILIATE_DISCLOSURE),
+  true,
+);
 
 const emptyTitleX = buildSocialPost({
   title: "   ",
@@ -388,5 +392,35 @@ const amazonCouponIg = buildInstagramCaption({
 });
 assert.equal(amazonCouponIg.includes(AMAZON_ASSOCIATE_DISCLOSURE), true);
 assert.equal(amazonCouponIg.includes(GENERIC_AFFILIATE_DISCLOSURE), false);
+
+const pricedSocial = {
+  title: "Instant Pot Duo Plus",
+  merchant: "amazon" as const,
+  currentPrice: 49,
+  slug: "instant-pot",
+  why: "This is a real drop versus recent street.",
+  stack: "Clip nothing. Confirm the total.",
+  verify: "If the total does not match, vote Expired.",
+};
+const pricedIg = buildInstagramCaption(pricedSocial);
+assert.equal(pricedIg.startsWith("$49 Instant Pot Duo Plus at Amazon"), true);
+assert.equal(pricedIg.includes("How it stacks:"), false);
+assert.equal(pricedIg.includes("Verify:"), false);
+assert.equal(pricedIg.includes(AMAZON_ASSOCIATE_DISCLOSURE), true);
+assert.equal(pricedIg.includes("@actuallydeals_"), true);
+assert.equal(pricedIg.includes("actuallydeals.com/deal/instant-pot"), true);
+assert.equal(pricedIg.includes("vote Expired"), false);
+
+const pricedFb = buildFacebookPost(pricedSocial);
+assert.equal(pricedFb.startsWith("$49 Instant Pot Duo Plus at Amazon"), true);
+assert.equal(
+  pricedFb.indexOf("actuallydeals.com/deal/instant-pot") < pricedFb.indexOf(AMAZON_ASSOCIATE_DISCLOSURE),
+  true,
+);
+assert.equal(pricedFb.includes("How it stacks:"), false);
+assert.equal(pricedFb.includes("Verify:"), false);
+assert.equal(pricedFb.includes(AMAZON_ASSOCIATE_DISCLOSURE), true);
+assert.equal(pricedFb.includes("ActuallyDeals"), true);
+assert.equal(pricedFb.includes("vote Expired"), false);
 
 console.log("parser verification passed");

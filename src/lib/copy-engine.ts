@@ -233,27 +233,12 @@ function xPostFromHeadline(headline: string, input: SocialComposeInput, withCont
   return clipTweet(parts);
 }
 
-function longerCaptionBody(input: SocialComposeInput & { currentPrice: number }): string[] {
-  const parts = [priceHeadline(input.title, input.merchant, input.currentPrice)];
-  const why = input.why?.trim();
-  if (why) parts.push("", why);
-  const stack = input.stack?.trim();
-  if (stack) parts.push("", "How it stacks:", stack);
-  const verify = input.verify?.trim();
-  if (verify) parts.push("", "Verify:", verify);
-  return parts;
-}
-
-function couponCaptionParts(input: SocialComposeInput, handle: string): string {
+function couponCaptionParts(input: SocialComposeInput, handle: string, urlEarly = false): string {
   const url = publicDealUrl(input.slug);
-  const parts = [
-    couponHeadline(input.title, input.merchant, input.promoCode),
-    "",
-    disclosureLine(input.merchant),
-    "",
-    handle,
-  ];
-  if (url) parts.push("", url);
+  const parts = [couponHeadline(input.title, input.merchant, input.promoCode)];
+  if (urlEarly && url) parts.push("", url);
+  parts.push("", disclosureLine(input.merchant), "", handle);
+  if (!urlEarly && url) parts.push("", url);
   return parts.join("\n");
 }
 
@@ -268,17 +253,14 @@ export function buildSocialPost(input: SocialComposeInput): string {
   return "";
 }
 
-/** Slightly longer Instagram caption from our fields only. Does not post. */
+/** Photo-first Instagram caption: deal on line one, one why line, disclosure, handle, URL. Does not post. */
 export function buildInstagramCaption(input: SocialComposeInput): string {
   if (hasLivePrice(input.currentPrice)) {
     const url = publicDealUrl(input.slug);
-    const parts = [
-      ...longerCaptionBody({ ...input, currentPrice: input.currentPrice }),
-      "",
-      disclosureLine(input.merchant),
-      "",
-      `@${SOCIAL.instagram.handle}`,
-    ];
+    const parts = [priceHeadline(input.title, input.merchant, input.currentPrice)];
+    const context = oneContextLine(input.why, input.stack);
+    if (context) parts.push("", context);
+    parts.push("", disclosureLine(input.merchant), "", `@${SOCIAL.instagram.handle}`);
     if (url) parts.push("", url);
     return parts.join("\n");
   }
@@ -288,22 +270,19 @@ export function buildInstagramCaption(input: SocialComposeInput): string {
   return "";
 }
 
-/** Facebook draft from our fields only. Page name ActuallyDeals. Does not post. */
+/** Facebook draft: deal first, our deal URL next so the preview works. Page name ActuallyDeals. Does not post. */
 export function buildFacebookPost(input: SocialComposeInput): string {
   if (hasLivePrice(input.currentPrice)) {
     const url = publicDealUrl(input.slug);
-    const parts = [
-      ...longerCaptionBody({ ...input, currentPrice: input.currentPrice }),
-      "",
-      disclosureLine(input.merchant),
-      "",
-      SOCIAL.facebook.handle,
-    ];
+    const parts = [priceHeadline(input.title, input.merchant, input.currentPrice)];
     if (url) parts.push("", url);
+    const why = input.why?.trim();
+    if (why) parts.push("", why);
+    parts.push("", disclosureLine(input.merchant), "", SOCIAL.facebook.handle);
     return parts.join("\n");
   }
   if (canWriteCouponSocial(input)) {
-    return couponCaptionParts(input, SOCIAL.facebook.handle);
+    return couponCaptionParts(input, SOCIAL.facebook.handle, true);
   }
   return "";
 }
