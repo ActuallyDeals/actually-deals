@@ -130,9 +130,6 @@ export const CJ_PUBLISHER_PID = "8059705";
  */
 export const CJ_DICKS_ADVERTISER_ID = "7345657";
 
-/** Remembered Rakuten Advertising / Linkshare SID. Prefer AFFILIATE_RAKUTEN_SID. */
-export const RAKUTEN_SID = "4745711";
-
 /**
  * CJ deep-link form used here (query shape only; no network call):
  * https://www.anrdoezrs.net/click-{PID}-{AID}?url={ENCODED_DEST}
@@ -171,7 +168,8 @@ export function affiliateTags() {
     hotelsAid: envValue("AFFILIATE_CJ_HOTELS_AID"),
     pricelineAid: envValue("AFFILIATE_CJ_PRICELINE_AID"),
     ebayCampaignId: envValue("AFFILIATE_EBAY_CAMPAIGN_ID"),
-    rakutenSid: envValue("AFFILIATE_RAKUTEN_SID") || RAKUTEN_SID,
+    // Rakuten account terminated 2026-09-02. SID only from env; empty = no Newegg wrap even if MID is set.
+    rakutenSid: envValue("AFFILIATE_RAKUTEN_SID"),
     neweggMid: envValue("AFFILIATE_NEWEGG_MID"),
   };
 }
