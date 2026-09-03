@@ -151,6 +151,16 @@ function rakutenDeepLink(sid: string, mid: string, dest: string): string {
   return wrap.toString();
 }
 
+
+/** Terminated 2026-09-02. Never wrap with this SID, even if env is set. */
+const DEAD_RAKUTEN_SID = "4745711";
+
+function liveRakutenSid(raw: string): string {
+  const sid = raw.trim();
+  if (!sid || sid === DEAD_RAKUTEN_SID) return "";
+  return sid;
+}
+
 export function affiliateTags() {
   return {
     amazon:
@@ -169,7 +179,8 @@ export function affiliateTags() {
     pricelineAid: envValue("AFFILIATE_CJ_PRICELINE_AID"),
     ebayCampaignId: envValue("AFFILIATE_EBAY_CAMPAIGN_ID"),
     // Rakuten account terminated 2026-09-02. SID only from env; empty = no Newegg wrap even if MID is set.
-    rakutenSid: envValue("AFFILIATE_RAKUTEN_SID"),
+    // Hard-block the terminated SID even if someone pastes it into Vercel env.
+    rakutenSid: liveRakutenSid(envValue("AFFILIATE_RAKUTEN_SID")),
     neweggMid: envValue("AFFILIATE_NEWEGG_MID"),
   };
 }
