@@ -58,7 +58,7 @@ export async function PATCH(
     let socialError: string | undefined;
     let socialPosted: string[] | undefined;
     if (deal.status === "published" && existing?.status === "draft") {
-      const social = await autoPostSocial(deal);
+      const social = await autoPostSocial(deal, { force: Boolean(body.postToSocial) });
       socialPosted = social.posted;
       socialError = social.error ?? undefined;
     }

@@ -160,9 +160,15 @@ export interface SocialPostResult {
   error: string | null;
 }
 
-/** No-op unless SOCIAL_AUTO_POST=true. Never throws. Never posts drafts. */
-export async function autoPostSocial(deal: Deal): Promise<SocialPostResult> {
-  if (!socialAutoPostEnabled()) return { posted: [], error: null };
+/**
+ * Posts when SOCIAL_AUTO_POST=true, or when opts.force is true (desk checkbox / Post to socials).
+ * Missing API keys still no-op that network. Never throws. Never posts drafts.
+ */
+export async function autoPostSocial(
+  deal: Deal,
+  opts?: { force?: boolean },
+): Promise<SocialPostResult> {
+  if (!opts?.force && !socialAutoPostEnabled()) return { posted: [], error: null };
   if (deal.status !== "published") return { posted: [], error: null };
 
   const drafts = parseSocialDrafts(deal.socialPost);

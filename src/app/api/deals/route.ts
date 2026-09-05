@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     let socialError: string | undefined;
     let socialPosted: string[] | undefined;
     if (deal.status === "published") {
-      const social = await autoPostSocial(deal);
+      const social = await autoPostSocial(deal, { force: Boolean(body.postToSocial) });
       socialPosted = social.posted;
       socialError = social.error ?? undefined;
     }

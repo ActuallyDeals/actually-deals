@@ -1,17 +1,44 @@
 ---
-description: Actually Deals product and architecture rules
+description: Actually Deals product constraints for Cursor (always on)
 globs: ["**/*"]
 alwaysApply: true
 ---
 
-Follow `BLUEPRINT.md` as the source of truth, then `docs/CONSTITUTION.md`, `docs/ARCHITECTURE.md`, and `docs/DATABASE.md`.
+You are smarter than the briefing agent. Treat what follows as **non-negotiable product constraints and success outcomes**. Prefer a better implementation, architecture, or UX when it still hits these outcomes. Do not invent affiliate IDs, prices, deals, or secrets. Do not clone third-party deal copy.
 
-- Persist deals, votes, and comments only through `src/lib/store.ts`.
-- Never use `next/image` for product photos. Use a standard `<img>` with the 3-tier resolver in `src/lib/images.ts`.
-- `/api/parse-deal` must stay merchant-tolerant: extract IDs from the URL even when the retailer blocks the scrape.
-- Strip tracking params and attach affiliate tags in `src/lib/affiliate.ts`. Do not leave `utm_*`, `pf_rd_*`, or click IDs on outbound links.
-- Amazon Associates Store ID is `actuallydea07-20` (`NEXT_PUBLIC_AMAZON_AFFILIATE_TAG` / `AFFILIATE_AMAZON_TAG`). Do not use `actuallydeals-20`.
-- Deal cards stay fully clickable without breaking nested Copy Code / Get Deal controls.
-- Do not add auth providers, extra component libraries, or a second database.
-- After behavior changes, keep `npx tsc --noEmit` and `npm run build` green.
-- House social: X `@actuallydeals`, Instagram `actuallydeals_` (underscore; URL `https://www.instagram.com/actuallydeals_/`), Facebook `ActuallyDeals`. Do not drop the Instagram underscore. Do not change the X handle or the domain `actuallydeals.com`. Use `src/lib/social.ts`.
+## Product
+- Live site: https://www.actuallydeals.com — slogan **Deals that are actually good!**
+- Queue-first desk at `/admin`. Founder (Michael Margulis / Mike) publishes unless he explicitly asked you to publish.
+- Best-deals-first, original writeups, his affiliate links only. Dead deals gray out. Never write “we’re first” on the site.
+- House social: X `@actuallydeals`, Instagram `@actuallydeals_` (underscore), Facebook `ActuallyDeals`. Auto-post kill switch; official APIs only; no session scraping.
+
+## Architecture (prefer existing seams)
+- Persist only through `src/lib/store.ts`.
+- Product photos: plain `<img>` + `src/lib/images.ts` (no `next/image`).
+- Parse / ingest: `src/lib/ingest-roundup.ts`, `src/lib/parse-deal.ts` — merchant-tolerant; Amazon bot walls must degrade (ASIN from OP + CDN), not hard-fail.
+- Affiliates: `src/lib/affiliate.ts` — strip tracking; empty env ID = clean retailer URL.
+- Amazon Store ID / tag: **`actuallydea07-20` only** (never `actuallydeals-20`).
+- Rakuten SID **`4745711` is dead** — hard-block; never wrap Newegg with it; no second Rakuten account.
+- Ship: GitHub `ActuallyDeals/actually-deals` `main` → Vercel **actually-deals** (hyphen) → www. Leftover no-hyphen Vercel project never gets the domain.
+- One packed increment per PR. `npx tsc --noEmit` green; run `npx tsx scripts/verify-parser.mts` when parse/affiliate/copy changes.
+
+## Editorial / price integrity (standing)
+- Original voice only. Reject Deal Score / Frontpage / slickdeals / doctorofcredit / hip2save / freebie guy chrome (`looksClonedWriteup`).
+- **Always include every source instruction** (qty, which coupon/link to click/activate, SnS, order). Missing a step = customer won’t get the same price.
+- Plain titles — no `SnS`, `AC`, `~$`, `[Code] $0* |` jargon.
+- Separate numbered stack steps; never invent was-prices.
+- DoC: live promo code only.
+
+## Security
+- Empty `ADMIN_PASSWORD` hard-fails `/admin`. No default password in repo. No Staff footer. `/admin` noindex.
+- Secrets in Vercel env only — never `NEXT_PUBLIC_` passwords, never SSN/EIN/bank in chat or logs.
+- Keep baseline security headers; don’t add a CSP that breaks Amazon CDN without verifying.
+
+## Affiliates (IDs as of 2026-09 — do not invent newer ones)
+- Live wrap: Amazon `actuallydea07-20`.
+- CJ member `7745283`, PID `8059705`; Dick’s AID `7345657` (join may still be required). Travel AIDs env-only.
+- Impact / eBay click IDs: only when present in env. FlexOffers `1559269` declined — no Costco wrap. HD Impact declined. Target often unavailable.
+- Signup bar: only stores we’d post (incl. travel). Legal name **Michael Margulis**. Brand Actually Deals.
+
+## How to take a task
+State the outcome you’ll ship, use a better path if you have one, keep the constraints above, and prove it with tests / a short PR summary.

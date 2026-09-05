@@ -366,6 +366,7 @@ export function AdminPublisher({
   const [xDraftLocked, setXDraftLocked] = useState(false);
   const [igDraftLocked, setIgDraftLocked] = useState(false);
   const [fbDraftLocked, setFbDraftLocked] = useState(false);
+  const [postToSocial, setPostToSocial] = useState(true);
   const parsedUrls = useRef(new Set<string>());
   const urlRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -750,7 +751,46 @@ export function AdminPublisher({
       summary: draft.summary.trim() || null,
       status,
       queueStage,
+      postToSocial: status === "published" ? postToSocial : false,
     };
+  }
+
+
+  async function postLiveToSocials() {
+    if (!editingSlug || !editingLive) {
+      setError("Open a live deal first.");
+      return;
+    }
+    setSaving("social");
+    setError(null);
+    setNotice(null);
+    try {
+      const body = payloadFromDraft("published", null);
+      const saveRes = await fetch(`/api/deals/${editingSlug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, postToSocial: false }),
+      });
+      const saved = (await saveRes.json()) as { error?: string; deal?: Deal };
+      if (!saveRes.ok || !saved.deal) throw new Error(saved.error || "Could not save drafts.");
+      const response = await fetch(`/api/deals/${editingSlug}/social`, { method: "POST" });
+      const payload = (await response.json()) as { error?: string | null; posted?: string[] };
+      if (!response.ok) throw new Error(payload.error || "Social post failed.");
+      if (payload.error) {
+        toast.error(payload.error);
+        setError(payload.error);
+      }
+      const extra = payload.posted?.length ? `Posted to ${payload.posted.join(", ")}.` : "No networks posted (missing keys or empty drafts).";
+      toast.success(extra);
+      setNotice(extra);
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Social post failed.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSaving(null);
+    }
   }
 
   async function save(status: Deal["status"], queueStage: QueueStage | null, label: string) {
@@ -1288,11 +1328,20 @@ export function AdminPublisher({
                       ? "Save live deal"
                       : "Publish to the site"}
           </Button>
-          <p className="text-xs text-slate-500">
-            {socialAutoPost
-              ? "Publish also posts to X, Instagram, and Facebook."
-              : "Social auto-post is off. Publish still goes to the site."}
-          </p>
+          <label className="flex items-start gap-2 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={postToSocial || socialAutoPost}
+              disabled={socialAutoPost}
+              onChange={(e) => setPostToSocial(e.target.checked)}
+            />
+            <span>
+              {socialAutoPost
+                ? "Env auto-post is on — Publish also posts to X, Instagram, and Facebook when API keys exist."
+                : "Also post to X, Instagram, and Facebook on Publish (needs API keys in Vercel). Missing keys skip that network."}
+            </span>
+          </label>
           <div className="grid grid-cols-3 gap-2">
             <Button
               type="button"
@@ -1405,10 +1454,21 @@ export function AdminPublisher({
               </div>
               {canComposeSocial ? (
                 <div className="space-y-3">
+                  {editingLive && editingSlug ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={Boolean(saving)}
+                      onClick={() => void postLiveToSocials()}
+                    >
+                      {saving === "social" ? "Posting…" : "Post to socials now"}
+                    </Button>
+                  ) : null}
                   <SocialDraftBox
                     id="social-x"
                     label="X draft"
-                    hint="Autofilled. Auto-post on Publish only if SOCIAL_AUTO_POST=true."
+                    hint="Autofilled. Posts on Publish when the social checkbox is on (or SOCIAL_AUTO_POST=true) and API keys exist."
                     value={draft.socialPost}
                     copyMeta={`${draft.socialPost.length}/280`}
                     copiedLabel="X draft copied."

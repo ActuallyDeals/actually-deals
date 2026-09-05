@@ -143,6 +143,8 @@ export interface PublishDealInput {
   summary?: string | null;
   status?: DealStatus;
   queueStage?: QueueStage | null;
+  /** Desk opt-in: also post X/IG/FB on this publish (needs API keys). */
+  postToSocial?: boolean;
 }
 
 export function isCommunityExpired(deal: Deal): boolean {
