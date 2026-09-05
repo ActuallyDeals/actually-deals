@@ -30,18 +30,40 @@ export function inferStackFromTitle(title: string): { clipCoupon: boolean; subsc
 const GENERIC_STACK_COPY =
   /clip[\s\S]{0,48}coupon|coupon[\s\S]{0,24}clip|subscribe\s*(?:&|and)?\s*save|\bsns\b|\bs&s\b/i;
 
-export function dealHasCouponStack(deal: { title: string; promoCode?: string | null }): boolean {
+export function dealHasCouponStack(deal: {
+  title: string;
+  promoCode?: string | null;
+  bullets?: string[] | null;
+  stackingSteps?: StackingStep[] | null;
+}): boolean {
   if (deal.promoCode?.trim()) return true;
   const inferred = inferStackFromTitle(deal.title);
-  return inferred.clipCoupon || inferred.subscribeSave;
+  if (inferred.clipCoupon || inferred.subscribeSave) return true;
+  // Staff writeups often put the real stack in bullets/steps without SnS/AC in the title.
+  const blob = [
+    ...(deal.bullets ?? []),
+    ...(deal.stackingSteps ?? []).map((step) => `${step.title} ${step.detail}`),
+  ].join("\n");
+  return /subscribe\s*(?:&|and)?\s*save|\bsns\b|save\s+\d+%\s+when you buy|activat(?:e|ion).{0,40}coupon|clip(?:\s+the)?\s+(?:on-page\s+)?coupon|buy-?\d/i.test(
+    blob,
+  );
 }
 
 function confirmLiveTotal(merchant: Merchant, sourceUrl?: string | null): string {
   return `Confirm the live total at ${merchantLabel(merchant, sourceUrl)} before you pay.`;
 }
 
+/** Short Amazon boilerplate only — never staff how-to that mentions a real coupon/SnS stack. */
 function isGenericStackCopy(text: string): boolean {
-  return GENERIC_STACK_COPY.test(text);
+  const t = text.trim();
+  if (!t || t.length > 140) return false;
+  if (/save\s+\d+%|when you buy|activat|quantity|set qty|buy-?\d|must /i.test(t)) return false;
+  return (
+    /^clip the (?:on-page )?coupon/i.test(t) ||
+    /^turn on subscribe\s*(?:&|and)?\s*save/i.test(t) ||
+    /^clip the coupon and turn on subscribe/i.test(t) ||
+    /^clip any on-page coupon/i.test(t)
+  );
 }
 
 /** Display-time only. Does not rewrite stored desk bullets. */
@@ -52,6 +74,7 @@ export function publicBullets(deal: {
   promoCode?: string | null;
   sourceUrl?: string | null;
   affiliateUrl?: string | null;
+  stackingSteps?: StackingStep[] | null;
 }): string[] {
   if (dealHasCouponStack(deal)) return deal.bullets;
   const confirm = confirmLiveTotal(deal.merchant, deal.sourceUrl || deal.affiliateUrl);
@@ -66,6 +89,7 @@ export function publicStackingSteps(deal: {
   promoCode?: string | null;
   sourceUrl?: string | null;
   affiliateUrl?: string | null;
+  bullets?: string[] | null;
 }): StackingStep[] {
   if (dealHasCouponStack(deal)) return deal.stackingSteps;
   const confirm = confirmLiveTotal(deal.merchant, deal.sourceUrl || deal.affiliateUrl);

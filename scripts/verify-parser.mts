@@ -23,7 +23,7 @@ import { giftCardFaceValue } from "../src/lib/pricing.ts";
 import { isCouponOnlyDeal, isDirectRetailerListing, isRetailerShortUrl } from "../src/lib/outbound.ts";
 import { socialAutoPostEnabled } from "../src/lib/social-post.ts";
 import { buildDanBullets, buildFacebookPost, buildInstagramCaption, buildSocialPost, extractDealMechanics } from "../src/lib/copy-engine.ts";
-import { looksClonedWriteup, publicBullets } from "../src/lib/stack-copy.ts";
+import { looksClonedWriteup, publicBullets, publicStackingSteps, dealHasCouponStack } from "../src/lib/stack-copy.ts";
 import { AMAZON_ASSOCIATE_DISCLOSURE, GENERIC_AFFILIATE_DISCLOSURE } from "../src/lib/disclosures.ts";
 
 assert.equal(withHttps("amazon.com/dp/B08PQ2KWHS"), "https://amazon.com/dp/B08PQ2KWHS");
@@ -76,6 +76,30 @@ assert.equal(
   true,
 );
 assert.equal(amazonNoCodeBullets[0], "$3.49 at Amazon. Confirm the total at checkout.");
+
+// Tide PODS public stack must keep buy-4 activate instructions (not stomp to confirm-live-total).
+const tideDeal = {
+  title: "Tide PODS 112-count (Spring Meadow), 4 bags for about $51 at Amazon",
+  merchant: "amazon" as const,
+  promoCode: null,
+  bullets: [
+    "Four 112-count bags land around $51.01 after the buy-4 discount and Subscribe & Save.",
+    "You must set quantity to 4, then click/activate the Save 33% when you buy 4 coupon on Amazon — changing quantity alone will not work.",
+    "Free shipping with Prime or on $35+ orders. If the cart is not about $51, skip it.",
+  ],
+  stackingSteps: [
+    { step: 1, title: "Open the listing", detail: "Open the Amazon listing with Get Deal." },
+    { step: 2, title: "Set quantity to 4", detail: "Set quantity to 4." },
+    { step: 3, title: "Activate buy-4 coupon", detail: "On the Amazon page, find and click/activate the Save 33% when you buy 4 coupon/offer. Do not skip this." },
+    { step: 4, title: "Subscribe & Save", detail: "Turn on Subscribe & Save (5%). You can cancel after it ships." },
+    { step: 5, title: "Confirm cart", detail: "Confirm the cart is about $51.01 before you pay." },
+  ],
+};
+assert.equal(dealHasCouponStack(tideDeal), true);
+assert.equal(publicBullets(tideDeal)[1].includes("Save 33%"), true);
+assert.equal(publicBullets(tideDeal).some((b) => b === "Confirm the live total at Amazon before you pay."), false);
+assert.equal(publicStackingSteps(tideDeal).length, 5);
+assert.equal(publicStackingSteps(tideDeal)[2].detail.includes("Save 33%"), true);
 assert.equal(
   amazonNoCodeBullets[1],
   "Free Prime shipping on eligible orders; otherwise check the threshold.",
